@@ -16,7 +16,7 @@ if 'view_date_us' not in st.session_state:
 if 'view_date_jp' not in st.session_state:
     st.session_state.view_date_jp = datetime.now(pytz.timezone('Asia/Tokyo')).date().replace(day=1)
 
-# --- スタイル設定（爆速ツールチップの実装） ---
+# --- スタイル設定 ---
 st.markdown("""
 <style>
     body { color: #444; }
@@ -50,19 +50,15 @@ st.markdown("""
     .holiday-red { color: #ff4b4b; font-weight: bold; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* --- カスタムツールチップの魔法 --- */
+    /* --- カスタムツールチップ --- */
     .tooltip-container {
         position: relative;
         display: inline-block;
         cursor: pointer;
     }
-
-    /* 祝日の下線 */
     .has-holiday {
         border-bottom: 1px dotted #ff4b4b;
     }
-
-    /* ツールチップ本体（最初は非表示） */
     .tooltip-text {
         visibility: hidden;
         width: max-content;
@@ -73,18 +69,16 @@ st.markdown("""
         padding: 4px 8px;
         position: absolute;
         z-index: 100;
-        bottom: 125%; /* 数字の上に表示 */
+        bottom: 125%;
         left: 50%;
         transform: translateX(-50%);
         opacity: 0;
-        transition: opacity 0.1s; /* 0.1秒でパッと出る */
+        transition: opacity 0.1s;
         font-size: 0.75rem;
         font-family: sans-serif;
         white-space: nowrap;
         pointer-events: none;
     }
-
-    /* マウスが重なった瞬間に表示 */
     .tooltip-container:hover .tooltip-text {
         visibility: visible;
         opacity: 1;
@@ -125,6 +119,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def move_month(key, delta):
+    current = st.session_state[key]
+    new_month = current.month + delta
+    new_year = current.year
+    if new_month > 12: new_month = 1; new_year += 1
+    elif new_month < 1: new_month = 12; new_year -= 1
+    st.session_state[key] = date(new_year, new_month, 1)
+
+def reset_month(key, country_tz):
+    st.session_state[key] = datetime.now(pytz.timezone(country_tz)).date().replace(day=1)
+
 def draw_calendar_area(now_full, country_code, state_key, country_tz):
     view_date = st.session_state[state_key]
     st.markdown(f"### {view_date.strftime('%Y年 %m月')}")
@@ -142,9 +147,6 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
                 h_name = target_holidays.get(curr_date)
                 is_weekend = (i == 0 or i == 6)
                 
-                # HTML構造の組み立て
-                content = f'{day}'
-                span_class = ""
                 tooltip_html = f'<span class="tooltip-text">{h_name}</span>' if h_name else ""
                 container_class = "tooltip-container" if h_name else ""
                 underline_class = "has-holiday" if h_name else ""
@@ -168,17 +170,6 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
         if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
     with c5:
         if st.button("▶", key=f"next_{state_key}"): move_month(state_key, 1)
-
-def move_month(key, delta):
-    current = st.session_state[key]
-    new_month = current.month + delta
-    new_year = current.year
-    if new_month > 12: new_month = 1; new_year += 1
-    elif new_month < 1: new_month = 12; new_year -= 1
-    st.session_state[key] = date(new_year, new_month, 1)
-
-def reset_month(key, country_tz):
-    st.session_state[key] = datetime.now(pytz.timezone(country_tz)).date().replace(day=1)
 
 def get_market_info(now, market_type):
     cc = "US" if market_type == "US" else "JP"
