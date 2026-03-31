@@ -10,16 +10,16 @@ st_autorefresh(interval=1000, key="datetimereload")
 
 st.set_page_config(page_title="日/米 株式市場リアルタイムカレンダー", layout="wide")
 
-# --- セッション状態の初期化 ---
-if 'view_date_us' not in st.session_state:
-    st.session_state.view_date_us = datetime.now(pytz.timezone('America/New_York')).date().replace(day=1)
-if 'view_date_jp' not in st.session_state:
-    st.session_state.view_date_jp = datetime.now(pytz.timezone('Asia/Tokyo')).date().replace(day=1)
-
 # --- スタイル設定 ---
 st.markdown("""
 <style>
     body { color: #444; }
+
+    /* タイトル横のリンクマーク（クリップのようなマーク）を非表示にする */
+    .viewerBadge_container__1QSob { display: none; }
+    button.step-down, button.step-up { display: none; }
+    header a { display: none !important; } 
+    .stHeaderActionElements { display: none !important; }
 
     /* カレンダーテーブル */
     .calendar-table {
@@ -50,15 +50,9 @@ st.markdown("""
     .holiday-red { color: #ff4b4b; font-weight: bold; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* --- カスタムツールチップ --- */
-    .tooltip-container {
-        position: relative;
-        display: inline-block;
-        cursor: pointer;
-    }
-    .has-holiday {
-        border-bottom: 1px dotted #ff4b4b;
-    }
+    /* カスタムツールチップ */
+    .tooltip-container { position: relative; display: inline-block; cursor: pointer; }
+    .has-holiday { border-bottom: 1px dotted #ff4b4b; }
     .tooltip-text {
         visibility: hidden;
         width: max-content;
@@ -79,10 +73,7 @@ st.markdown("""
         white-space: nowrap;
         pointer-events: none;
     }
-    .tooltip-container:hover .tooltip-text {
-        visibility: visible;
-        opacity: 1;
-    }
+    .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
 
     /* 市場ステータス枠 */
     .market-status {
@@ -192,13 +183,19 @@ def get_market_info(now, market_type):
     else:
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
+# --- セッション状態の初期化 ---
+if 'view_date_us' not in st.session_state:
+    st.session_state.view_date_us = datetime.now(pytz.timezone('America/New_York')).date().replace(day=1)
+if 'view_date_jp' not in st.session_state:
+    st.session_state.view_date_jp = datetime.now(pytz.timezone('Asia/Tokyo')).date().replace(day=1)
+
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 col1, col2 = st.columns(2, gap="large")
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 
 with col1:
-    st.header("🇺🇸 米国市場")
+    st.header("🇺🇸 米国株式市場") # 修正
     is_dst = now_ny.dst() != timedelta(0)
     dst_label = "（サマータイム中）" if is_dst else "（非サマータイム：標準時）"
     st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">{dst_label}</span></div>', unsafe_allow_html=True)
@@ -207,7 +204,7 @@ with col1:
     draw_calendar_area(now_ny, "US", "view_date_us", "America/New_York")
 
 with col2:
-    st.header("🇯🇵 日本市場")
+    st.header("🇯🇵 日本株式市場") # 修正
     st.markdown(f'<div class="date-time-row"><span>{now_jp.strftime("%Y/%m/%d %H:%M:%S")}</span></div>', unsafe_allow_html=True)
     status, color = get_market_info(now_jp, "JP")
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
