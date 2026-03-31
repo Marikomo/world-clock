@@ -1,7 +1,12 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 import calendar
+import holidays
+from streamlit_autorefresh import st_autorefresh
+
+# 1秒ごとに更新
+st_autorefresh(interval=1000, key="datetimereload")
 
 st.set_page_config(page_title="日/米 株式市場リアルタイムカレンダー", layout="wide")
 
@@ -15,9 +20,13 @@ st.markdown("""
         padding: 5px;
         font-weight: bold;
         display: inline-block;
-        width: 25px;
-        height: 25px;
-        line-height: 25px;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+    }
+    .holiday-text {
+        color: #ff4b4b;
+        font-weight: bold;
     }
     .calendar-table {
         font-family: monospace;
@@ -33,13 +42,12 @@ st.markdown("""
         border-radius: 5px;
         margin-bottom: 15px;
     }
-    /* 日付と時計を同じ行にするスタイル */
     .date-time-row {
-        font-size: 1.25rem; /* st.subheaderに近いサイズ */
+        font-size: 1.25rem;
         font-weight: 600;
         margin-bottom: 5px;
         display: flex;
-        gap: 15px; /* 日付と時計の間隔 */
+        gap: 15px;
         align-items: center;
     }
     .tz-small {
@@ -50,89 +58,95 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def draw_calendar(date_obj):
-    # 1. 日付と時計を同じ行に表示
+def draw_calendar(date_obj, country_code):
+    # 祝日データの取得
+    target_holidays = holidays.CountryHoliday(country_code)
+    
+    # 日付と時計
     date_str = date_obj.strftime('%Y / %m / %d')
     time_str = date_obj.strftime('%H:%M:%S')
-    
-    # サマータイム判定（アメリカのみ）
     tz_info = ""
-    if hasattr(date_obj.tzinfo, 'zone') and date_obj.tzinfo.zone == 'America/New_York':
+    if country_code == 'US':
         is_dst = date_obj.dst() != timedelta(0)
-        tz_info = f'<span class="tz-small"> ({"サマータイム中: EDT" if is_dst else "標準時: EST"})</span>'
+        tz_info = f'<span class="tz-small"> ({"サマータイム: EDT" if is_dst else "標準時: EST"})</span>'
     
-    st.markdown(f'''
-        <div class="date-time-row">
-            <span>{date_str}</span>
-            <span>{time_str}{tz_info}</span>
-        </div>
-    ''', unsafe_allow_html=True)
+    st.markdown(f'<div class="date-time-row"><span>{date_str}</span><span>{time_str}{tz_info}</span></div>', unsafe_allow_html=True)
 
-    # 2. カレンダーの表示
+    # カレンダー描画
     cal = calendar.monthcalendar(date_obj.year, date_obj.month)
     html = '<table class="calendar-table"><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>'
+    
     for week in cal:
         html += '<tr>'
         for day in week:
             if day == 0:
                 html += '<td></td>'
-            elif day == date_obj.day:
-                html += f'<td><span class="today-marker">{day}</span></td>'
             else:
-                html += f'<td>{day}</td>'
+                current_date = date(date_obj.year, date_obj.month, day)
+                is_holiday = current_date in target_holidays
+                
+                # 今日のマーク優先、祝日は赤字
+                if day == date_obj.day:
+                    html += f'<td><span class="today-marker">{day}</span></td>'
+                elif is_holiday:
+                    html += f'<td><span class="holiday-text">{day}</span></td>'
+                else:
+                    html += f'<td>{day}</td>'
         html += '</tr>'
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
+    
+    # 本日が祝日の場合、祝日名を表示
+    if date(date_obj.year, date_obj.month, date_obj.day) in target_holidays:
+        st.caption(f"📍 本日は祝日です: {target_holidays.get(date(date_obj.year, date_obj.month, date_obj.day))}")
 
 def get_market_info(now, market_type):
+    # 祝日判定
+    country_code = "US" if market_type == "US" else "JP"
+    target_holidays = holidays.CountryHoliday(country_code)
+    is_holiday = date(now.year, now.month, now.day) in target_holidays
+    
     if market_type == "US":
         open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
         close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    else: # JP
+    else:
         open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
         close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
     
     is_weekday = 0 <= now.weekday() <= 4
-    if is_weekday:
-        if now < open_time:
-            diff = open_time - now
-            h, m = divmod(diff.seconds // 60, 60)
-            status_text = f"⏳ CLOSED (開場まで: {h}時間{m}分)"
-            color = "#fffbe6"
-        elif open_time <= now < close_time:
-            diff = close_time - now
-            h, m = divmod(diff.seconds // 60, 60)
-            status_text = f"🟢 OPEN (閉場まで: {h}時間{m}分)"
-            color = "#e6ffed"
-        else:
-            status_text = "🔴 CLOSED (本日の取引終了)"
-            color = "#fff1f0"
+    
+    if not is_weekday or is_holiday:
+        reason = "週末休み" if not is_weekday else "祝日休場"
+        return f"😴 CLOSED ({reason})", "#f5f5f5"
+    
+    if now < open_time:
+        diff = open_time - now
+        h, m, s = diff.seconds // 3600, (diff.seconds // 60) % 60, diff.seconds % 60
+        return f"⏳ CLOSED (開場まで: {h}:{m:02d}:{s:02d})", "#fffbe6"
+    elif open_time <= now < close_time:
+        diff = close_time - now
+        h, m, s = diff.seconds // 3600, (diff.seconds // 60) % 60, diff.seconds % 60
+        return f"🟢 OPEN (閉場まで: {h}:{m:02d}:{s:02d})", "#e6ffed"
     else:
-        status_text = "😴 CLOSED (週末休み)"
-        color = "#f5f5f5"
-    return status_text, color
+        return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
-# タイムゾーン設定
+# 実行
 tz_ny = pytz.timezone('America/New_York')
 tz_jp = pytz.timezone('Asia/Tokyo')
 now_ny = datetime.now(tz_ny)
 now_jp = datetime.now(tz_jp)
 
-# タイトル
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 
 col1, col2 = st.columns(2)
-
-# --- 米国株式市場 ---
 with col1:
     st.header("🇺🇸 米国株式市場")
-    status_ny, color_ny = get_market_info(now_ny, "US")
-    st.markdown(f'<div class="market-status" style="background-color: {color_ny};">{status_ny}</div>', unsafe_allow_html=True)
-    draw_calendar(now_ny)
+    status, color = get_market_info(now_ny, "US")
+    st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
+    draw_calendar(now_ny, "US")
 
-# --- 日本株式市場 ---
 with col2:
     st.header("🇯🇵 日本株式市場")
-    status_jp, color_jp = get_market_info(now_jp, "JP")
-    st.markdown(f'<div class="market-status" style="background-color: {color_jp};">{status_jp}</div>', unsafe_allow_html=True)
-    draw_calendar(now_jp)
+    status, color = get_market_info(now_jp, "JP")
+    st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
+    draw_calendar(now_jp, "JP")
