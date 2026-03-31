@@ -24,6 +24,7 @@ st.markdown("""
         text-align: center;
         width: 100%;
         border-collapse: collapse;
+        margin-top: 10px;
     }
     .market-status {
         font-size: 1.2rem;
@@ -32,29 +33,42 @@ st.markdown("""
         border-radius: 5px;
         margin-bottom: 15px;
     }
-    .time-display {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #31333F;
-        margin-bottom: 10px;
+    /* 日付と時計を同じ行にするスタイル */
+    .date-time-row {
+        font-size: 1.25rem; /* st.subheaderに近いサイズ */
+        font-weight: 600;
+        margin-bottom: 5px;
+        display: flex;
+        gap: 15px; /* 日付と時計の間隔 */
+        align-items: center;
+    }
+    .tz-small {
+        font-size: 0.9rem;
+        color: #666;
+        font-weight: normal;
     }
 </style>
 """, unsafe_allow_html=True)
 
 def draw_calendar(date_obj):
-    # 1. 日付の表示
-    st.markdown(f"#### {date_obj.strftime('%Y / %m / %d')}")
-    
-    # 2. 時計の表示（サマータイム判定付き）
+    # 1. 日付と時計を同じ行に表示
+    date_str = date_obj.strftime('%Y / %m / %d')
     time_str = date_obj.strftime('%H:%M:%S')
+    
+    # サマータイム判定（アメリカのみ）
     tz_info = ""
     if hasattr(date_obj.tzinfo, 'zone') and date_obj.tzinfo.zone == 'America/New_York':
         is_dst = date_obj.dst() != timedelta(0)
-        tz_info = " (サマータイム中: EDT)" if is_dst else " (標準時: EST)"
+        tz_info = f'<span class="tz-small"> ({"サマータイム中: EDT" if is_dst else "標準時: EST"})</span>'
     
-    st.markdown(f'<div class="time-display">{time_str}{tz_info}</div>', unsafe_allow_html=True)
+    st.markdown(f'''
+        <div class="date-time-row">
+            <span>{date_str}</span>
+            <span>{time_str}{tz_info}</span>
+        </div>
+    ''', unsafe_allow_html=True)
 
-    # 3. カレンダーの表示
+    # 2. カレンダーの表示
     cal = calendar.monthcalendar(date_obj.year, date_obj.month)
     html = '<table class="calendar-table"><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>'
     for week in cal:
@@ -104,7 +118,7 @@ tz_jp = pytz.timezone('Asia/Tokyo')
 now_ny = datetime.now(tz_ny)
 now_jp = datetime.now(tz_jp)
 
-# タイトル（ここがエラーの箇所でした）
+# タイトル
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 
 col1, col2 = st.columns(2)
