@@ -1,3 +1,4 @@
 streamlit
 pytz
 streamlit-autorefresh
+holidays
