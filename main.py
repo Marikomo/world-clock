@@ -23,11 +23,13 @@ st.markdown("""
         width: 28px;
         height: 28px;
         line-height: 28px;
-        cursor: help;
     }
     .holiday-red {
         color: #ff4b4b;
         font-weight: bold;
+    }
+    /* 祝日（title属性あり）のみカーソルを「？」にする */
+    [title] {
         cursor: help;
     }
     .calendar-table {
@@ -59,10 +61,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def draw_calendar(date_obj, country_code):
-    # 祝日データの取得
     target_holidays = holidays.CountryHoliday(country_code)
     
-    # 日付と時計
     date_str = date_obj.strftime('%Y / %m / %d')
     time_str = date_obj.strftime('%H:%M:%S')
     tz_info = ""
@@ -72,7 +72,6 @@ def draw_calendar(date_obj, country_code):
     
     st.markdown(f'<div class="date-time-row"><span>{date_str}</span><span>{time_str}{tz_info}</span></div>', unsafe_allow_html=True)
 
-    # カレンダー描画
     cal = calendar.monthcalendar(date_obj.year, date_obj.month)
     html = '<table class="calendar-table"><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>'
     
@@ -86,16 +85,20 @@ def draw_calendar(date_obj, country_code):
                 holiday_name = target_holidays.get(current_date)
                 is_weekend = (i == 0 or i == 6)
                 
-                # ホバー時に出すテキスト
+                # ホバー用テキスト（祝日の場合のみ設定）
                 tooltip = f'title="{holiday_name}"' if holiday_name else ""
                 
                 if day == date_obj.day:
-                    # 今日が祝日の場合は祝日名も入れる
-                    today_tip = f'title="今日 {f": {holiday_name}" if holiday_name else ""}"'
-                    html += f'<td><span class="today-marker" {today_tip}>{day}</span></td>'
-                elif holiday_name or is_weekend:
+                    # 今日。祝日なら祝日名を出す
+                    html += f'<td><span class="today-marker" {tooltip}>{day}</span></td>'
+                elif holiday_name:
+                    # 祝日（赤字 ＋ ホバーあり）
                     html += f'<td><span class="holiday-red" {tooltip}>{day}</span></td>'
+                elif is_weekend:
+                    # ただの土日（赤字 ＋ ホバーなし）
+                    html += f'<td><span class="holiday-red">{day}</span></td>'
                 else:
+                    # 平日
                     html += f'<td>{day}</td>'
         html += '</tr>'
     html += '</table>'
@@ -129,11 +132,11 @@ def get_market_info(now, market_type):
     else:
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
-# タイトル
-st.title("📊 日/米 株式市場リアルタイムカレンダー")
-
+# 実行
 now_ny = datetime.now(pytz.timezone('America/New_York'))
 now_jp = datetime.now(pytz.timezone('Asia/Tokyo'))
+
+st.title("📊 日/米 株式市場リアルタイムカレンダー")
 
 col1, col2 = st.columns(2)
 with col1:
