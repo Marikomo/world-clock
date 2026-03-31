@@ -1,9 +1,9 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import pytz
 import calendar
 
-st.set_page_config(page_title="Market Dashboard", layout="wide")
+st.set_page_config(page_title="日/米 株式市場カレンダー", layout="wide")
 
 # --- スタイル設定 ---
 st.markdown("""
@@ -65,21 +65,18 @@ def get_market_info(now, market_type):
     
     if is_weekday:
         if now < open_time:
-            # 開場前
             diff = open_time - now
             h, m = divmod(diff.seconds // 60, 60)
             status_text = f"⏳ CLOSED (開場まで: {h}時間{m}分)"
-            color = "#fffbe6" # 薄い黄色
+            color = "#fffbe6" # 黄
         elif open_time <= now < close_time:
-            # 開場中
             diff = close_time - now
             h, m = divmod(diff.seconds // 60, 60)
             status_text = f"🟢 OPEN (閉場まで: {h}時間{m}分)"
-            color = "#e6ffed" # 薄い緑
+            color = "#e6ffed" # 緑
         else:
-            # 閉場後（翌営業日の計算は簡易化してCLOSED表示）
             status_text = "🔴 CLOSED (本日の取引終了)"
-            color = "#fff1f0" # 薄い赤
+            color = "#fff1f0" # 赤
     else:
         status_text = "😴 CLOSED (週末休み)"
         color = "#f5f5f5" # グレー
@@ -92,7 +89,8 @@ tz_jp = pytz.timezone('Asia/Tokyo')
 now_ny = datetime.now(tz_ny)
 now_jp = datetime.now(tz_jp)
 
-st.title("📊 Global Market Dashboard")
+# タイトル
+st.title("📊 日/米 株式市場カレンダー")
 
 col1, col2 = st.columns(2)
 
@@ -111,4 +109,3 @@ with col2:
     st.markdown(f'<div class="market-status" style="background-color: {color_jp};">{status_jp}</div>', unsafe_allow_html=True)
     draw_calendar(now_jp)
     st.metric("Tokyo Time", now_jp.strftime('%H:%M:%S'))
-    
