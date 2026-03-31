@@ -55,24 +55,34 @@ def draw_calendar(date_obj):
 def get_market_info(now, market_type):
     # 市場時間の定義
     if market_type == "US":
-        open_time = now.replace(hour=9, minute=30, second=0)
-        close_time = now.replace(hour=16, minute=0, second=0)
+        open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
     else: # JP
-        open_time = now.replace(hour=9, minute=0, second=0)
-        close_time = now.replace(hour=15, minute=0, second=0)
+        open_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
     
     is_weekday = 0 <= now.weekday() <= 4
-    is_open = is_weekday and open_time <= now < close_time
     
-    if is_open:
-        remaining = close_time - now
-        hours, remainder = divmod(remaining.seconds, 3600)
-        minutes = remainder // 60
-        status_text = f"🟢 OPEN (閉まるまで: {hours}時間{minutes}分)"
-        color = "#e6ffed"
+    if is_weekday:
+        if now < open_time:
+            # 開場前
+            diff = open_time - now
+            h, m = divmod(diff.seconds // 60, 60)
+            status_text = f"⏳ CLOSED (開場まで: {h}時間{m}分)"
+            color = "#fffbe6" # 薄い黄色
+        elif open_time <= now < close_time:
+            # 開場中
+            diff = close_time - now
+            h, m = divmod(diff.seconds // 60, 60)
+            status_text = f"🟢 OPEN (閉場まで: {h}時間{m}分)"
+            color = "#e6ffed" # 薄い緑
+        else:
+            # 閉場後（翌営業日の計算は簡易化してCLOSED表示）
+            status_text = "🔴 CLOSED (本日の取引終了)"
+            color = "#fff1f0" # 薄い赤
     else:
-        status_text = "🔴 CLOSED"
-        color = "#fff1f0"
+        status_text = "😴 CLOSED (週末休み)"
+        color = "#f5f5f5" # グレー
         
     return status_text, color
 
@@ -101,3 +111,4 @@ with col2:
     st.markdown(f'<div class="market-status" style="background-color: {color_jp};">{status_jp}</div>', unsafe_allow_html=True)
     draw_calendar(now_jp)
     st.metric("Tokyo Time", now_jp.strftime('%H:%M:%S'))
+    
