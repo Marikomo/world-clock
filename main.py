@@ -19,7 +19,7 @@ if 'view_date_jp' not in st.session_state:
 # --- スタイル設定 ---
 st.markdown("""
 <style>
-    /* 全体のフォント色を統一 */
+    /* 全体のフォント色 */
     body { color: #444; }
 
     /* カレンダーテーブル */
@@ -52,14 +52,14 @@ st.markdown("""
     .has-tooltip { cursor: pointer; border-bottom: 1px dotted #ff4b4b; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* 市場ステータス枠（カレンダーの枠色 #444 と統一） */
+    /* 市場ステータス枠（薄いグレーに調整） */
     .market-status {
         font-size: 1.1rem;
         font-weight: bold;
         padding: 10px;
         border-radius: 0px !important;
         margin-bottom: 10px;
-        border: 1px solid #444; /* カレンダーの基本色に合わせる */
+        border: 1px solid #ddd; /* 薄いグレー */
         color: #444;
     }
     
@@ -72,18 +72,18 @@ st.markdown("""
         align-items: center;
         color: #444;
     }
-    .tz-small { font-size: 0.8rem; color: #666; font-weight: normal; }
+    .tz-label { font-size: 0.9rem; color: #666; font-weight: normal; margin-left: 5px; }
 
-    /* ボタンのデザイン（カレンダーの枠色 #444 と完全に一致させる） */
+    /* ボタンのデザイン（枠線を薄いグレー #ddd に設定） */
     .stButton > button {
         border-radius: 0px !important;
-        border: 1px solid #444 !important; /* ここをカレンダーの色と合わせました */
+        border: 1px solid #ddd !important; /* 薄いグレー */
         background-color: white;
         color: #444;
         font-weight: bold;
         width: 100%;
         height: 40px;
-        transition: 0.3s;
+        transition: 0.2s;
     }
     .stButton > button:hover {
         border-color: #ff4b4b !important;
@@ -172,8 +172,10 @@ now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 col1, col2 = st.columns(2)
 with col1:
     st.header("🇺🇸 米国市場")
+    # サマータイム判定とラベルの日本語化
     is_dst = now_ny.dst() != timedelta(0)
-    st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-small">({"EDT" if is_dst else "EST"})</span></div>', unsafe_allow_html=True)
+    dst_label = "（サマータイム中）" if is_dst else "（非サマータイム：標準時）"
+    st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">{dst_label}</span></div>', unsafe_allow_html=True)
     status, color = get_market_info(now_ny, "US")
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_ny, "US", "view_date_us", "America/New_York")
