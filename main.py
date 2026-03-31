@@ -90,13 +90,13 @@ st.markdown("""
         background-color: #fffafa;
     }
 
-    /* 左右のカラムの間の余白 */
-    [data-testid="column"]:first-of-type {
-        padding-right: 60px !important;
-    }
-    [data-testid="column"]:last-of-type {
-        padding-left: 60px !important;
-    }
+    /* 左矢印を左寄せ、右矢印を右寄せにするためのCSS */
+    [data-testid="stHorizontalBlock"] div:nth-child(1) button { text-align: left; padding-left: 10px; }
+    [data-testid="stHorizontalBlock"] div:nth-child(5) button { text-align: right; padding-right: 10px; }
+
+    /* カラム間の余白 */
+    [data-testid="column"]:first-of-type { padding-right: 60px !important; }
+    [data-testid="column"]:last-of-type { padding-left: 60px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -142,9 +142,9 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # ボタンの配置：左端に矢印、中央に今月、右端に矢印
-    # 5つのカラムに分け、ボタンを1番目、3番目、5番目に配置
-    c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+    # We(3列目)を中心に配置するためのカラム設定
+    # カレンダーの7列に対応させて、ボタンの配置を最適化
+    c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 2, 1.2, 1.2])
     with c1:
         if st.button("◀", key=f"prev_{state_key}"): move_month(state_key, -1)
     with c3:
