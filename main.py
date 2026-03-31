@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import calendar
 
@@ -45,12 +45,10 @@ def draw_calendar(date_obj):
     # 1. 日付の表示
     st.markdown(f"#### {date_obj.strftime('%Y / %m / %d')}")
     
-    # 2. 時計の表示（日付のすぐ後ろ）
+    # 2. 時計の表示（サマータイム判定付き）
     time_str = date_obj.strftime('%H:%M:%S')
-    
-    # サマータイム判定（アメリカのみ）
     tz_info = ""
-    if date_obj.tzinfo.zone == 'America/New_York':
+    if hasattr(date_obj.tzinfo, 'zone') and date_obj.tzinfo.zone == 'America/New_York':
         is_dst = date_obj.dst() != timedelta(0)
         tz_info = " (サマータイム中: EDT)" if is_dst else " (標準時: EST)"
     
@@ -101,11 +99,26 @@ def get_market_info(now, market_type):
     return status_text, color
 
 # タイムゾーン設定
-from datetime import timedelta
 tz_ny = pytz.timezone('America/New_York')
 tz_jp = pytz.timezone('Asia/Tokyo')
 now_ny = datetime.now(tz_ny)
 now_jp = datetime.now(tz_jp)
 
-# タイトル
-st.title("📊 日
+# タイトル（ここがエラーの箇所でした）
+st.title("📊 日/米 株式市場リアルタイムカレンダー")
+
+col1, col2 = st.columns(2)
+
+# --- 米国株式市場 ---
+with col1:
+    st.header("🇺🇸 米国株式市場")
+    status_ny, color_ny = get_market_info(now_ny, "US")
+    st.markdown(f'<div class="market-status" style="background-color: {color_ny};">{status_ny}</div>', unsafe_allow_html=True)
+    draw_calendar(now_ny)
+
+# --- 日本株式市場 ---
+with col2:
+    st.header("🇯🇵 日本株式市場")
+    status_jp, color_jp = get_market_info(now_jp, "JP")
+    st.markdown(f'<div class="market-status" style="background-color: {color_jp};">{status_jp}</div>', unsafe_allow_html=True)
+    draw_calendar(now_jp)
