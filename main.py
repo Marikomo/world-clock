@@ -90,18 +90,12 @@ st.markdown("""
         background-color: #fffafa;
     }
 
-    /* 左右のカラムの間に「特大」の余白を作る */
-    [data-testid="column"]:first-child {
-        padding-right: 60px !important; /* 米国市場の右側を空ける */
+    /* 左右のカラムの間の余白 */
+    [data-testid="column"]:first-of-type {
+        padding-right: 60px !important;
     }
-    [data-testid="column"]:last-child {
-        padding-left: 60px !important; /* 日本市場の左側を空ける */
-    }
-    
-    /* 画面全体の左右にも少し余裕を持たせる */
-    .main .block-container {
-        padding-left: 50px;
-        padding-right: 50px;
+    [data-testid="column"]:last-of-type {
+        padding-left: 60px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -148,12 +142,14 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns([1, 1, 1])
+    # ボタンの配置：左端に矢印、中央に今月、右端に矢印
+    # 5つのカラムに分け、ボタンを1番目、3番目、5番目に配置
+    c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
     with c1:
         if st.button("◀", key=f"prev_{state_key}"): move_month(state_key, -1)
-    with c2:
-        if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
     with c3:
+        if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
+    with c5:
         if st.button("▶", key=f"next_{state_key}"): move_month(state_key, 1)
 
 def get_market_info(now, market_type):
@@ -180,7 +176,6 @@ def get_market_info(now, market_type):
 
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 
-# カラム間のgapを最大にし、CSSでのpaddingも増やしました
 col1, col2 = st.columns(2, gap="large")
 
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
