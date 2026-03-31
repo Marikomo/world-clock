@@ -16,7 +16,7 @@ if 'view_date_us' not in st.session_state:
 if 'view_date_jp' not in st.session_state:
     st.session_state.view_date_jp = datetime.now(pytz.timezone('Asia/Tokyo')).date().replace(day=1)
 
-# --- スタイル設定 ---
+# --- スタイル設定（爆速ツールチップの実装） ---
 st.markdown("""
 <style>
     body { color: #444; }
@@ -32,9 +32,9 @@ st.markdown("""
         color: #444;
     }
     .calendar-table tr { height: 40px; }
-    .calendar-table td, .calendar-table th { vertical-align: middle; padding: 0; }
+    .calendar-table td, .calendar-table th { vertical-align: middle; padding: 0; position: relative; }
     
-    /* 今日のマーカー（角張り） */
+    /* 今日のマーカー */
     .today-marker {
         background-color: #ff4b4b;
         color: white;
@@ -48,9 +48,48 @@ st.markdown("""
     }
     
     .holiday-red { color: #ff4b4b; font-weight: bold; }
-    .has-tooltip { cursor: pointer; border-bottom: 1px dotted #ff4b4b; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
+    /* --- カスタムツールチップの魔法 --- */
+    .tooltip-container {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+
+    /* 祝日の下線 */
+    .has-holiday {
+        border-bottom: 1px dotted #ff4b4b;
+    }
+
+    /* ツールチップ本体（最初は非表示） */
+    .tooltip-text {
+        visibility: hidden;
+        width: max-content;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 4px;
+        padding: 4px 8px;
+        position: absolute;
+        z-index: 100;
+        bottom: 125%; /* 数字の上に表示 */
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.1s; /* 0.1秒でパッと出る */
+        font-size: 0.75rem;
+        font-family: sans-serif;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+
+    /* マウスが重なった瞬間に表示 */
+    .tooltip-container:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+
     /* 市場ステータス枠 */
     .market-status {
         font-size: 1.1rem;
@@ -66,10 +105,7 @@ st.markdown("""
         font-size: 1.2rem;
         font-weight: 600;
         margin-bottom: 10px;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        color: #444;
+        display: flex; gap: 10px; align-items: center; color: #444;
     }
     .tz-label { font-size: 0.9rem; color: #666; font-weight: normal; margin-left: 5px; }
 
@@ -77,41 +113,17 @@ st.markdown("""
     .stButton > button {
         border-radius: 0px !important;
         border: 1px solid #ddd !important;
-        background-color: white;
-        color: #444;
-        font-weight: bold;
-        width: 100%;
-        height: 40px;
-        transition: 0.2s;
+        background-color: white; color: #444; font-weight: bold;
+        width: 100%; height: 40px;
     }
-    .stButton > button:hover {
-        border-color: #ff4b4b !important;
-        color: #ff4b4b;
-        background-color: #fffafa;
-    }
-
-    /* 左矢印を左寄せ、右矢印を右寄せにするためのCSS */
     [data-testid="stHorizontalBlock"] div:nth-child(1) button { text-align: left; padding-left: 10px; }
     [data-testid="stHorizontalBlock"] div:nth-child(5) button { text-align: right; padding-right: 10px; }
 
-    /* カラム間の余白 */
+    /* 左右の余白 */
     [data-testid="column"]:first-of-type { padding-right: 60px !important; }
     [data-testid="column"]:last-of-type { padding-left: 60px !important; }
 </style>
 """, unsafe_allow_html=True)
-
-def move_month(key, delta):
-    current = st.session_state[key]
-    new_month = current.month + delta
-    new_year = current.year
-    if new_month > 12:
-        new_month = 1; new_year += 1
-    elif new_month < 1:
-        new_month = 12; new_year -= 1
-    st.session_state[key] = date(new_year, new_month, 1)
-
-def reset_month(key, country_tz):
-    st.session_state[key] = datetime.now(pytz.timezone(country_tz)).date().replace(day=1)
 
 def draw_calendar_area(now_full, country_code, state_key, country_tz):
     view_date = st.session_state[state_key]
@@ -129,11 +141,18 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
                 curr_date = date(view_date.year, view_date.month, day)
                 h_name = target_holidays.get(curr_date)
                 is_weekend = (i == 0 or i == 6)
-                tip = f'title="{h_name}"' if h_name else ""
+                
+                # HTML構造の組み立て
+                content = f'{day}'
+                span_class = ""
+                tooltip_html = f'<span class="tooltip-text">{h_name}</span>' if h_name else ""
+                container_class = "tooltip-container" if h_name else ""
+                underline_class = "has-holiday" if h_name else ""
+
                 if curr_date == now_full.date():
-                    html += f'<td><span class="today-marker" {tip}>{day}</span></td>'
+                    html += f'<td><div class="{container_class}"><span class="today-marker">{day}</span>{tooltip_html}</div></td>'
                 elif h_name:
-                    html += f'<td><span class="holiday-red has-tooltip" title="{h_name}">{day}</span></td>'
+                    html += f'<td><div class="{container_class}"><span class="holiday-red {underline_class}">{day}</span>{tooltip_html}</div></td>'
                 elif is_weekend:
                     html += f'<td><span class="holiday-red">{day}</span></td>'
                 else:
@@ -142,8 +161,6 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # We(3列目)を中心に配置するためのカラム設定
-    # カレンダーの7列に対応させて、ボタンの配置を最適化
     c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 2, 1.2, 1.2])
     with c1:
         if st.button("◀", key=f"prev_{state_key}"): move_month(state_key, -1)
@@ -151,6 +168,17 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
         if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
     with c5:
         if st.button("▶", key=f"next_{state_key}"): move_month(state_key, 1)
+
+def move_month(key, delta):
+    current = st.session_state[key]
+    new_month = current.month + delta
+    new_year = current.year
+    if new_month > 12: new_month = 1; new_year += 1
+    elif new_month < 1: new_month = 12; new_year -= 1
+    st.session_state[key] = date(new_year, new_month, 1)
+
+def reset_month(key, country_tz):
+    st.session_state[key] = datetime.now(pytz.timezone(country_tz)).date().replace(day=1)
 
 def get_market_info(now, market_type):
     cc = "US" if market_type == "US" else "JP"
@@ -160,7 +188,6 @@ def get_market_info(now, market_type):
         ot, ct = now.replace(hour=9, minute=30, second=0), now.replace(hour=16, minute=0, second=0)
     else:
         ot, ct = now.replace(hour=9, minute=0, second=0), now.replace(hour=15, minute=0, second=0)
-    
     is_wd = 0 <= now.weekday() <= 4
     if not is_wd or is_h:
         r = "週末休み" if not is_wd else f"祝日休場 ({th.get(now.date())})"
@@ -175,9 +202,7 @@ def get_market_info(now, market_type):
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
-
 col1, col2 = st.columns(2, gap="large")
-
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 
