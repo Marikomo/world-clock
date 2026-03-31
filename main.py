@@ -5,7 +5,7 @@ import calendar
 import holidays
 from streamlit_autorefresh import st_autorefresh
 
-# 1秒ごとに更新（時計の精度と毎日の日付更新を担保）
+# 1秒ごとに更新（時計の秒数と、日付が変わった際の自動更新を担保）
 st_autorefresh(interval=1000, key="datetimereload")
 
 st.set_page_config(page_title="日/米 株式市場リアルタイムカレンダー", layout="wide")
@@ -49,24 +49,29 @@ st.markdown("""
     .holiday-red { color: #ff4b4b; font-weight: bold; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* ニュースボックス（高さを統一するための設定） */
+    /* ニュースボックス（左右の高さを統一） */
     .news-box {
         border: 1px solid #ddd;
         padding: 15px;
         margin-top: 20px;
         color: #444;
         background-color: #fff;
-        min-height: 250px; /* 高さを揃えるための最小値 */
+        min-height: 280px;
         display: flex;
         flex-direction: column;
     }
     .news-title {
         font-weight: bold;
         font-size: 1.0rem;
+        margin-bottom: 5px;
+        line-height: 1.4;
+    }
+    .news-update-time {
+        font-size: 0.75rem;
+        color: #888;
         margin-bottom: 12px;
         border-bottom: 1px solid #eee;
         padding-bottom: 8px;
-        line-height: 1.4;
     }
     .news-list {
         margin: 0;
@@ -107,27 +112,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 毎日自動更新されるニュースロジック（日付をシードにしてニュースをシミュレート）
-def get_daily_news(market, current_date):
+# 毎日AM5:00に更新される想定のニュース生成ロジック
+def get_daily_news(market, current_datetime):
     # market: "US" or "JP"
-    # 本来はAPI連携ですが、ここでは日付が変わるたびに「最新」として内容が更新されるようロジックを組んでいます
-    day_str = current_date.strftime("%Y%m%d")
+    # 現在の日付に基づいたダミーニュース（実際はAPI等で最新情報を取得する箇所）
+    day_str = current_datetime.strftime("%Y/%m/%d")
     
     if market == "US":
         return [
-            f"【米株】FRB高官発言を受けた金利見通しの変化（{day_str}更新）",
-            "【米株】ハイテク銘柄を中心とした決算期待と警戒感",
-            "【政治】米大統領選に向けた経済公約の市場への影響",
-            "【経済】原油価格動向とインフレ期待指数の推移",
-            "【雇用】最新の労働市場データに基づく景気後退リスクの検証"
+            f"【米株】FRB議長、インフレ抑制への自信を強調（{day_str}）",
+            "【米株】大手テック企業のAI投資が利益率に与える影響を精査",
+            "【政治】米議会、新たな経済支援策の枠組みで基本合意",
+            "【経済】製造業景況指数が予想を上回り、景気の底堅さを証明",
+            "【雇用】失業率の微増が利下げ期待を再燃させる展開へ"
         ]
     else:
         return [
-            f"【日本株】為替介入警戒感と輸出関連株のボラティリティ（{day_str}更新）",
-            "【日本株】日銀の金融政策正常化プロセスに関する最新観測",
-            "【経済】国内賃上げ進展に伴う内需セクターの再評価",
-            "【政治】政府の資産運用立国推進策と新NISA資金の動向",
-            "【東証】低PBR改善企業への資金集中とガバナンス改革"
+            f"【日本株】円安進行に伴う製造業の収益改善期待（{day_str}）",
+            "【日本株】日銀審議委員による金融緩和修正の是非を巡る発言",
+            "【経済】消費支出の回復鈍化が内需株の重しとなる可能性",
+            "【政治】政府によるスタートアップ支援策の拡充が市場の刺激に",
+            "【東証】資本効率の改善を表明した銘柄への選別買いが継続"
         ]
 
 def draw_calendar_area(now_full, country_code, state_key, country_tz):
@@ -211,11 +216,12 @@ with col1:
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_ny, "US", "view_date_us", "America/New_York")
     
-    # 日次更新ニュース
+    # ニュースセクション
     news_list = get_daily_news("US", now_ny)
     st.markdown(f"""
     <div class="news-box">
         <div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_ny.strftime('%Y年%m月%d日')}）</div>
+        <div class="news-update-time">（最終更新：{now_ny.strftime('%Y年%m月%d日 %H時%M分')}）</div>
         <ul class="news-list">
             {''.join([f'<li>{item}</li>' for item in news_list])}
         </ul>
@@ -229,11 +235,12 @@ with col2:
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_jp, "JP", "view_date_jp", "Asia/Tokyo")
     
-    # 日次更新ニュース
+    # ニュースセクション
     news_list = get_daily_news("JP", now_jp)
     st.markdown(f"""
     <div class="news-box">
         <div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_jp.strftime('%Y年%m月%d日')}）</div>
+        <div class="news-update-time">（最終更新：{now_jp.strftime('%Y年%m月%d日 %H時%M分')}）</div>
         <ul class="news-list">
             {''.join([f'<li>{item}</li>' for item in news_list])}
         </ul>
