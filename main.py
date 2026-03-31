@@ -1,11 +1,11 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import calendar
 
-st.set_page_config(page_title="Market Calendar & Clock", layout="wide")
+st.set_page_config(page_title="Market Dashboard", layout="wide")
 
-# --- スタイル設定（カレンダーの見た目） ---
+# --- スタイル設定 ---
 st.markdown("""
 <style>
     .today-marker {
@@ -14,24 +14,31 @@ st.markdown("""
         border-radius: 50%;
         padding: 5px;
         font-weight: bold;
+        display: inline-block;
+        width: 25px;
+        height: 25px;
+        line-height: 25px;
     }
     .calendar-table {
         font-family: monospace;
-        line-height: 2;
         text-align: center;
         width: 100%;
+        border-collapse: collapse;
+    }
+    .market-status {
+        font-size: 1.2rem;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 def draw_calendar(date_obj):
-    # 年月を表示
-    st.markdown(f"### {date_obj.strftime('%Y / %m / %d')}")
-    
-    # カレンダーの作成
+    st.markdown(f"#### {date_obj.strftime('%Y / %m / %d')}")
     cal = calendar.monthcalendar(date_obj.year, date_obj.month)
     html = '<table class="calendar-table"><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>'
-    
     for week in cal:
         html += '<tr>'
         for day in week:
@@ -45,37 +52,52 @@ def draw_calendar(date_obj):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
-st.title("🗓️ Global Market Dashboard")
+def get_market_info(now, market_type):
+    # 市場時間の定義
+    if market_type == "US":
+        open_time = now.replace(hour=9, minute=30, second=0)
+        close_time = now.replace(hour=16, minute=0, second=0)
+    else: # JP
+        open_time = now.replace(hour=9, minute=0, second=0)
+        close_time = now.replace(hour=15, minute=0, second=0)
+    
+    is_weekday = 0 <= now.weekday() <= 4
+    is_open = is_weekday and open_time <= now < close_time
+    
+    if is_open:
+        remaining = close_time - now
+        hours, remainder = divmod(remaining.seconds, 3600)
+        minutes = remainder // 60
+        status_text = f"🟢 OPEN (閉まるまで: {hours}時間{minutes}分)"
+        color = "#e6ffed"
+    else:
+        status_text = "🔴 CLOSED"
+        color = "#fff1f0"
+        
+    return status_text, color
 
-# タイムゾーンの設定
+# タイムゾーン設定
 tz_ny = pytz.timezone('America/New_York')
 tz_jp = pytz.timezone('Asia/Tokyo')
-
 now_ny = datetime.now(tz_ny)
 now_jp = datetime.now(tz_jp)
 
+st.title("📊 Global Market Dashboard")
+
 col1, col2 = st.columns(2)
 
-# --- アメリカ（ニューヨーク）側 ---
+# --- 米国株式市場 ---
 with col1:
-    st.subheader("🇺🇸 New York / East Coast")
-    draw_calendar(now_ny) # カレンダー描画
-    st.metric("Current Time", now_ny.strftime('%H:%M:%S'))
-    
-    is_open_ny = 9 <= now_ny.hour < 16 or (now_ny.hour == 9 and now_ny.minute >= 30)
-    if 0 <= now_ny.weekday() <= 4 and is_open_ny:
-        st.success("🟢 Market is OPEN")
-    else:
-        st.error("🔴 Market is CLOSED")
+    st.header("🇺🇸 米国株式市場")
+    status_ny, color_ny = get_market_info(now_ny, "US")
+    st.markdown(f'<div class="market-status" style="background-color: {color_ny};">{status_ny}</div>', unsafe_allow_html=True)
+    draw_calendar(now_ny)
+    st.metric("New York Time", now_ny.strftime('%H:%M:%S'))
 
-# --- 日本（東京）側 ---
+# --- 日本株式市場 ---
 with col2:
-    st.subheader("🇯🇵 Tokyo / Japan")
-    draw_calendar(now_jp) # カレンダー描画
-    st.metric("Current Time", now_jp.strftime('%H:%M:%S'))
-    
-    is_open_jp = 9 <= now_jp.hour < 15
-    if 0 <= now_jp.weekday() <= 4 and is_open_jp:
-        st.success("🟢 Market is OPEN")
-    else:
-        st.error("🔴 Market is CLOSED")
+    st.header("🇯🇵 日本株式市場")
+    status_jp, color_jp = get_market_info(now_jp, "JP")
+    st.markdown(f'<div class="market-status" style="background-color: {color_jp};">{status_jp}</div>', unsafe_allow_html=True)
+    draw_calendar(now_jp)
+    st.metric("Tokyo Time", now_jp.strftime('%H:%M:%S'))
