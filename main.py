@@ -19,7 +19,6 @@ if 'view_date_jp' not in st.session_state:
 # --- スタイル設定 ---
 st.markdown("""
 <style>
-    /* 全体のフォント色 */
     body { color: #444; }
 
     /* カレンダーテーブル */
@@ -52,14 +51,14 @@ st.markdown("""
     .has-tooltip { cursor: pointer; border-bottom: 1px dotted #ff4b4b; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* 市場ステータス枠（薄いグレーに調整） */
+    /* 市場ステータス枠 */
     .market-status {
         font-size: 1.1rem;
         font-weight: bold;
         padding: 10px;
         border-radius: 0px !important;
         margin-bottom: 10px;
-        border: 1px solid #ddd; /* 薄いグレー */
+        border: 1px solid #ddd;
         color: #444;
     }
     
@@ -74,10 +73,10 @@ st.markdown("""
     }
     .tz-label { font-size: 0.9rem; color: #666; font-weight: normal; margin-left: 5px; }
 
-    /* ボタンのデザイン（枠線を薄いグレー #ddd に設定） */
+    /* ボタンのデザイン */
     .stButton > button {
         border-radius: 0px !important;
-        border: 1px solid #ddd !important; /* 薄いグレー */
+        border: 1px solid #ddd !important;
         background-color: white;
         color: #444;
         font-weight: bold;
@@ -89,6 +88,12 @@ st.markdown("""
         border-color: #ff4b4b !important;
         color: #ff4b4b;
         background-color: #fffafa;
+    }
+
+    /* 左右のカラムの間に余白を作るためのスタイル */
+    [data-testid="column"] {
+        padding-left: 25px !important;
+        padding-right: 25px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -166,13 +171,15 @@ def get_market_info(now, market_type):
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
+
+# gap="large" を追加してカラム間の余白を広げる
+col1, col2 = st.columns(2, gap="large")
+
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 
-col1, col2 = st.columns(2)
 with col1:
     st.header("🇺🇸 米国市場")
-    # サマータイム判定とラベルの日本語化
     is_dst = now_ny.dst() != timedelta(0)
     dst_label = "（サマータイム中）" if is_dst else "（非サマータイム：標準時）"
     st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">{dst_label}</span></div>', unsafe_allow_html=True)
