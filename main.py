@@ -5,6 +5,10 @@ import calendar
 import holidays
 from streamlit_autorefresh import st_autorefresh
 
+# --- カレンダーの基本設定（ここが重要！） ---
+# Pythonのデフォルト（月曜始まり）を、表示に合わせて「日曜日始まり」に変更します
+calendar.setfirstweekday(calendar.SUNDAY)
+
 # 1秒ごとに更新
 st_autorefresh(interval=1000, key="datetimereload")
 
@@ -32,6 +36,7 @@ st.markdown("""
     .today-marker {
         background-color: #ff4b4b;
         color: white;
+        border-radius: 0%; 
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -39,7 +44,6 @@ st.markdown("""
     }
     
     .holiday-red { color: #ff4b4b; font-weight: bold; }
-    /* 経済イベント用の青色設定 */
     .event-blue { color: #1e90ff; font-weight: bold; border-bottom: 1px dotted #1e90ff; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
@@ -63,7 +67,6 @@ st.markdown("""
         font-size: 0.7rem;
         white-space: pre-wrap;
         pointer-events: none;
-        line-height: 1.4;
     }
     .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
 
@@ -83,7 +86,6 @@ st.markdown("""
         font-size: 1.1rem;
         font-weight: bold;
         padding: 10px;
-        margin-bottom: 10px;
         border: 1px solid #ddd;
         color: #444;
     }
@@ -97,46 +99,36 @@ st.markdown("""
     .tz-label { font-size: 0.8rem; color: #666; }
 
     .stButton > button {
+        border-radius: 0px !important;
         border: 1px solid #ddd !important;
         background-color: white; color: #444; font-weight: bold;
         width: 100%; height: 40px;
     }
+    [data-testid="stHorizontalBlock"] div:nth-child(1) button { text-align: left; padding-left: 10px; }
+    [data-testid="stHorizontalBlock"] div:nth-child(5) button { text-align: right; padding-right: 10px; }
 
     [data-testid="column"]:first-of-type { padding-right: 60px !important; }
     [data-testid="column"]:last-of-type { padding-left: 60px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- イベント判定ロジック ---
+# --- イベント判定（以前と同じ） ---
 def get_market_events(country_code, year, month, day):
     evs = []
     d = date(year, month, day)
-    weekday = d.weekday() # 0=Mon, 4=Fri
-    
+    weekday = d.weekday() 
     if country_code == "US":
-        # ISM製造業 (第1営業日)
         if day <= 7 and weekday == 0: evs.append("ISM製造業景況指数 (10:00)")
-        # 雇用統計 (第1金曜日)
         if day <= 7 and weekday == 4: evs.append("雇用統計 (08:30)")
-        # CPI (中旬 10-15日頃)
         if 10 <= day <= 14 and weekday <= 4: evs.append("CPI 消費者物価指数 (08:30)")
-        # PPI (CPIの翌営業日付近)
         if 13 <= day <= 17 and weekday <= 4: evs.append("PPI 生産者物価指数 (08:30)")
-        # ジャクソンホール (8月下旬)
         if month == 8 and 20 <= day <= 28: evs.append("ジャクソンホール会合")
-        # 中間選挙 (11月第1月曜の翌火曜 - 偶数年)
         if month == 11 and year % 4 == 2 and 2 <= day <= 8 and weekday == 1: evs.append("中間選挙")
-
-    else: # JP
-        # 日銀短観 (4,7,10,12月の月初)
+    else:
         if month in [4, 7, 10, 12] and day <= 3: evs.append("日銀短観 (08:50)")
-        # 春闘回答 (3月半ば)
         if month == 3 and 10 <= day <= 20 and weekday <= 4: evs.append("春闘集中回答日")
-        # CPI (20日頃)
         if 18 <= day <= 22 and weekday <= 4: evs.append("CPI 消費者物価指数 (08:30)")
-        # 日銀会合 (各月下旬)
         if 15 <= day <= 31 and weekday <= 4: evs.append("日銀金融政策決定会合")
-        
     return evs
 
 def draw_calendar_area(now_full, country_code, state_key, country_tz):
@@ -162,14 +154,13 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
                 
                 if h_name:
                     cls = "holiday-red"
-                    tip = f"【祝日】\n{h_name}"
+                    tip = f"【祝日】\\n{h_name}"
                 elif m_events:
                     cls = "event-blue"
-                    tip = f"【経済イベント】\n" + "\n".join(m_events)
-                elif i == 0 or i == 6:
+                    tip = f"【経済イベント】\\n" + "\\n".join(m_events)
+                elif i == 0 or i == 6: # 0=日曜, 6=土曜 (日曜日始まりに設定済み)
                     cls = "holiday-red"
 
-                # 今日の強調
                 if curr_date == now_full.date():
                     content = f'<span class="today-marker">{day}</span>'
                 
@@ -181,21 +172,21 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+    c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 2, 1.2, 1.2])
     with c1:
-        if st.button("◀", key=f"p_{state_key}"): move_month(state_key, -1)
+        if st.button("◀", key=f"prev_{state_key}"): move_month(state_key, -1)
     with c3:
-        if st.button("今月", key=f"t_{state_key}"): reset_month(state_key, country_tz)
+        if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
     with c5:
-        if st.button("▶", key=f"n_{state_key}"): move_month(state_key, 1)
+        if st.button("▶", key=f"next_{state_key}"): move_month(state_key, 1)
 
 def move_month(key, delta):
-    curr = st.session_state[key]
-    nm = curr.month + delta
-    ny = curr.year
-    if nm > 12: nm=1; ny+=1
-    elif nm < 1: nm=12; ny-=1
-    st.session_state[key] = date(ny, nm, 1)
+    current = st.session_state[key]
+    new_month = current.month + delta
+    new_year = current.year
+    if new_month > 12: new_month = 1; new_year += 1
+    elif new_month < 1: new_month = 12; new_year -= 1
+    st.session_state[key] = date(new_year, new_month, 1)
 
 def reset_month(key, country_tz):
     st.session_state[key] = datetime.now(pytz.timezone(country_tz)).date().replace(day=1)
@@ -234,7 +225,8 @@ now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 
 with col1:
     st.header("🇺🇸 米国株式市場")
-    dst_label = "（サマータイム中）" if now_ny.dst() != timedelta(0) else "（標準時）"
+    is_dst = now_ny.dst() != timedelta(0)
+    dst_label = "（サマータイム中）" if is_dst else "（非サマータイム：標準時）"
     st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">{dst_label}</span></div>', unsafe_allow_html=True)
     status, color = get_market_info(now_ny, "US")
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
