@@ -90,10 +90,18 @@ st.markdown("""
         background-color: #fffafa;
     }
 
-    /* 左右のカラムの間に余白を作るためのスタイル */
-    [data-testid="column"] {
-        padding-left: 25px !important;
-        padding-right: 25px !important;
+    /* 左右のカラムの間に「特大」の余白を作る */
+    [data-testid="column"]:first-child {
+        padding-right: 60px !important; /* 米国市場の右側を空ける */
+    }
+    [data-testid="column"]:last-child {
+        padding-left: 60px !important; /* 日本市場の左側を空ける */
+    }
+    
+    /* 画面全体の左右にも少し余裕を持たせる */
+    .main .block-container {
+        padding-left: 50px;
+        padding-right: 50px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -172,7 +180,7 @@ def get_market_info(now, market_type):
 
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 
-# gap="large" を追加してカラム間の余白を広げる
+# カラム間のgapを最大にし、CSSでのpaddingも増やしました
 col1, col2 = st.columns(2, gap="large")
 
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
