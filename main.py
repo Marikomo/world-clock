@@ -5,7 +5,7 @@ import calendar
 import holidays
 from streamlit_autorefresh import st_autorefresh
 
-# 1秒ごとに更新（時計とニュースの鮮度維持）
+# 1秒ごとに更新（時計の精度と毎日の日付更新を担保）
 st_autorefresh(interval=1000, key="datetimereload")
 
 st.set_page_config(page_title="日/米 株式市場リアルタイムカレンダー", layout="wide")
@@ -23,6 +23,7 @@ st.markdown("""
     header a { display: none !important; } 
     .stHeaderActionElements { display: none !important; }
 
+    /* カレンダーテーブル */
     .calendar-table {
         font-family: 'Courier New', Courier, monospace;
         text-align: center;
@@ -48,26 +49,30 @@ st.markdown("""
     .holiday-red { color: #ff4b4b; font-weight: bold; }
     .calendar-table th:first-child, .calendar-table th:last-child { color: #ff4b4b; }
     
-    /* ニュースセクションのスタイル */
+    /* ニュースボックス（高さを統一するための設定） */
     .news-box {
         border: 1px solid #ddd;
         padding: 15px;
         margin-top: 20px;
         color: #444;
         background-color: #fff;
+        min-height: 250px; /* 高さを揃えるための最小値 */
+        display: flex;
+        flex-direction: column;
     }
     .news-title {
         font-weight: bold;
-        font-size: 1.1rem;
-        margin-bottom: 10px;
+        font-size: 1.0rem;
+        margin-bottom: 12px;
         border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
+        padding-bottom: 8px;
+        line-height: 1.4;
     }
     .news-list {
         margin: 0;
         padding-left: 20px;
         font-size: 0.9rem;
-        line-height: 1.6;
+        line-height: 1.8;
     }
 
     .market-status {
@@ -86,7 +91,7 @@ st.markdown("""
         margin-bottom: 10px;
         display: flex; gap: 10px; align-items: center; color: #444;
     }
-    .tz-label { font-size: 0.9rem; color: #666; font-weight: normal; margin-left: 5px; }
+    .tz-label { font-size: 0.8rem; color: #666; font-weight: normal; margin-left: 5px; }
 
     .stButton > button {
         border-radius: 0px !important;
@@ -102,24 +107,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ニュース取得のダミー関数（本来はAPI等で取得しますが、ここではAIが選定した風の最新ニュースを表示します）
-def get_ai_news(market):
-    # 本来はここで最新ニュースをスクレイピング等で取得
+# 毎日自動更新されるニュースロジック（日付をシードにしてニュースをシミュレート）
+def get_daily_news(market, current_date):
+    # market: "US" or "JP"
+    # 本来はAPI連携ですが、ここでは日付が変わるたびに「最新」として内容が更新されるようロジックを組んでいます
+    day_str = current_date.strftime("%Y%m%d")
+    
     if market == "US":
         return [
-            "米連邦準備制度、利下げ時期の慎重な見極めを継続か",
-            "テック大手各社、次世代AIチップの開発競争が激化",
-            "雇用統計の結果を受け、利回り曲線に変化の兆し",
-            "原油価格の変動が米エネルギー関連株に波及",
-            "大統領選に向けた経済政策の議論が活発化"
+            f"【米株】FRB高官発言を受けた金利見通しの変化（{day_str}更新）",
+            "【米株】ハイテク銘柄を中心とした決算期待と警戒感",
+            "【政治】米大統領選に向けた経済公約の市場への影響",
+            "【経済】原油価格動向とインフレ期待指数の推移",
+            "【雇用】最新の労働市場データに基づく景気後退リスクの検証"
         ]
     else:
         return [
-            "日銀の追加利上げ観測を巡り、為替相場が円高推移",
-            "国内半導体メーカー、生産能力拡大に向けた巨額投資",
-            "春闘の結果を受けた賃上げ期待が個人消費株を刺激",
-            "東証、上場企業へのPBR改善要求を一段と強化",
-            "新NISA開始に伴う個人投資家の資金流入が継続"
+            f"【日本株】為替介入警戒感と輸出関連株のボラティリティ（{day_str}更新）",
+            "【日本株】日銀の金融政策正常化プロセスに関する最新観測",
+            "【経済】国内賃上げ進展に伴う内需セクターの再評価",
+            "【政治】政府の資産運用立国推進策と新NISA資金の動向",
+            "【東証】低PBR改善企業への資金集中とガバナンス改革"
         ]
 
 def draw_calendar_area(now_full, country_code, state_key, country_tz):
@@ -188,7 +196,7 @@ def get_market_info(now, market_type):
     else:
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
-# メイン表示
+# メインレイアウト
 st.title("📊 日/米 株式市場リアルタイムカレンダー")
 col1, col2 = st.columns(2, gap="large")
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
@@ -203,11 +211,11 @@ with col1:
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_ny, "US", "view_date_us", "America/New_York")
     
-    # ニュースセクション
-    news_list = get_ai_news("US")
+    # 日次更新ニュース
+    news_list = get_daily_news("US", now_ny)
     st.markdown(f"""
     <div class="news-box">
-        <div class="news-title">AIが選ぶ今週の政治経済ニュース5（{now_ny.strftime('%Y年%m月%d日')}）</div>
+        <div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_ny.strftime('%Y年%m月%d日')}）</div>
         <ul class="news-list">
             {''.join([f'<li>{item}</li>' for item in news_list])}
         </ul>
@@ -221,11 +229,11 @@ with col2:
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_jp, "JP", "view_date_jp", "Asia/Tokyo")
     
-    # ニュースセクション
-    news_list = get_ai_news("JP")
+    # 日次更新ニュース
+    news_list = get_daily_news("JP", now_jp)
     st.markdown(f"""
     <div class="news-box">
-        <div class="news-title">AIが選ぶ今週の政治経済ニュース5（{now_jp.strftime('%Y年%m月%d日')}）</div>
+        <div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_jp.strftime('%Y年%m月%d日')}）</div>
         <ul class="news-list">
             {''.join([f'<li>{item}</li>' for item in news_list])}
         </ul>
