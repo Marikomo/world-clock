@@ -23,14 +23,16 @@ st.markdown("""
         width: 28px;
         height: 28px;
         line-height: 28px;
+        text-align: center;
     }
     .holiday-red {
         color: #ff4b4b;
         font-weight: bold;
     }
-    /* 祝日（title属性あり）のみカーソルを「？」にする */
-    [title] {
-        cursor: help;
+    /* 祝日名が出る部分のポインターを自然な形にする */
+    .has-tooltip {
+        cursor: pointer;
+        border-bottom: 1px dotted #ff4b4b; /* 祝日には下線をつけて「何かある」ことを示します */
     }
     .calendar-table {
         font-family: monospace;
@@ -85,17 +87,15 @@ def draw_calendar(date_obj, country_code):
                 holiday_name = target_holidays.get(current_date)
                 is_weekend = (i == 0 or i == 6)
                 
-                # ホバー用テキスト（祝日の場合のみ設定）
-                tooltip = f'title="{holiday_name}"' if holiday_name else ""
-                
                 if day == date_obj.day:
-                    # 今日。祝日なら祝日名を出す
+                    # 今日
+                    tooltip = f'title="{holiday_name}"' if holiday_name else ""
                     html += f'<td><span class="today-marker" {tooltip}>{day}</span></td>'
                 elif holiday_name:
-                    # 祝日（赤字 ＋ ホバーあり）
-                    html += f'<td><span class="holiday-red" {tooltip}>{day}</span></td>'
+                    # 祝日（下線をつけて、ホバーで名前を出す）
+                    html += f'<td><span class="holiday-red has-tooltip" title="{holiday_name}">{day}</span></td>'
                 elif is_weekend:
-                    # ただの土日（赤字 ＋ ホバーなし）
+                    # ただの土日（赤字のみ、ホバーなし）
                     html += f'<td><span class="holiday-red">{day}</span></td>'
                 else:
                     # 平日
