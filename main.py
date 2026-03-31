@@ -24,7 +24,7 @@ st.markdown("""
         height: 28px;
         line-height: 28px;
     }
-    .holiday-text {
+    .holiday-red {
         color: #ff4b4b;
         font-weight: bold;
     }
@@ -34,6 +34,17 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
+    }
+    .calendar-table th {
+        padding: 5px;
+    }
+    /* 日曜日の列を赤くする */
+    .calendar-table th:first-child {
+        color: #ff4b4b;
+    }
+    /* 土曜日の列を青くしたい場合はここに追加できますが、今回はご要望通り「赤」に統一します */
+    .calendar-table th:last-child {
+        color: #ff4b4b;
     }
     .market-status {
         font-size: 1.2rem;
@@ -59,7 +70,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def draw_calendar(date_obj, country_code):
-    # 祝日データの取得
     target_holidays = holidays.CountryHoliday(country_code)
     
     # 日付と時計
@@ -78,30 +88,29 @@ def draw_calendar(date_obj, country_code):
     
     for week in cal:
         html += '<tr>'
-        for day in week:
+        for i, day in enumerate(week):
             if day == 0:
                 html += '<td></td>'
             else:
                 current_date = date(date_obj.year, date_obj.month, day)
                 is_holiday = current_date in target_holidays
+                is_weekend = (i == 0 or i == 6) # 0=日曜, 6=土曜
                 
-                # 今日のマーク優先、祝日は赤字
+                # スタイルの決定
+                class_name = ""
+                if is_holiday or is_weekend:
+                    class_name = 'class="holiday-red"'
+                
+                # 今日のマーク優先
                 if day == date_obj.day:
                     html += f'<td><span class="today-marker">{day}</span></td>'
-                elif is_holiday:
-                    html += f'<td><span class="holiday-text">{day}</span></td>'
                 else:
-                    html += f'<td>{day}</td>'
+                    html += f'<td><span {class_name}>{day}</span></td>'
         html += '</tr>'
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
-    
-    # 本日が祝日の場合、祝日名を表示
-    if date(date_obj.year, date_obj.month, date_obj.day) in target_holidays:
-        st.caption(f"📍 本日は祝日です: {target_holidays.get(date(date_obj.year, date_obj.month, date_obj.day))}")
 
 def get_market_info(now, market_type):
-    # 祝日判定
     country_code = "US" if market_type == "US" else "JP"
     target_holidays = holidays.CountryHoliday(country_code)
     is_holiday = date(now.year, now.month, now.day) in target_holidays
