@@ -5,8 +5,7 @@ import calendar
 import holidays
 from streamlit_autorefresh import st_autorefresh
 
-# --- カレンダーの基本設定（ここが重要！） ---
-# Pythonのデフォルト（月曜始まり）を、表示に合わせて「日曜日始まり」に変更します
+# --- カレンダーの基本設定 ---
 calendar.setfirstweekday(calendar.SUNDAY)
 
 # 1秒ごとに更新
@@ -27,7 +26,7 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
         color: #444;
     }
     .calendar-table tr { height: 40px; }
@@ -70,10 +69,20 @@ st.markdown("""
     }
     .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
 
+    /* 月間イベントリスト */
+    .event-list-box {
+        border: 1px solid #ddd;
+        padding: 12px;
+        margin-top: 10px;
+        margin-bottom: 15px;
+        background-color: #fafafa;
+    }
+    .event-list-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 8px; color: #1e90ff; }
+    .event-item { font-size: 0.85rem; line-height: 1.6; list-style: none; padding: 0; margin: 0; }
+
     .news-box {
         border: 1px solid #ddd;
         padding: 15px;
-        margin-top: 20px;
         color: #444;
         background-color: #fff;
         min-height: 280px;
@@ -112,7 +121,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- イベント判定（以前と同じ） ---
 def get_market_events(country_code, year, month, day):
     evs = []
     d = date(year, month, day)
@@ -137,6 +145,9 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     target_holidays = holidays.CountryHoliday(country_code)
     cal = calendar.monthcalendar(view_date.year, view_date.month)
     
+    # イベント情報の収集
+    monthly_events = []
+    
     html = '<table class="calendar-table"><tr><th>Su</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th></tr>'
     for week in cal:
         html += '<tr>'
@@ -148,17 +159,20 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
                 h_name = target_holidays.get(curr_date)
                 m_events = get_market_events(country_code, view_date.year, view_date.month, day)
                 
+                # リスト表示用に蓄積
+                for e in m_events:
+                    monthly_events.append(f"{day}日: {e}")
+                
                 content = str(day)
                 cls = ""
                 tip = ""
-                
                 if h_name:
                     cls = "holiday-red"
                     tip = f"【祝日】\\n{h_name}"
                 elif m_events:
                     cls = "event-blue"
                     tip = f"【経済イベント】\\n" + "\\n".join(m_events)
-                elif i == 0 or i == 6: # 0=日曜, 6=土曜 (日曜日始まりに設定済み)
+                elif i == 0 or i == 6:
                     cls = "holiday-red"
 
                 if curr_date == now_full.date():
@@ -172,6 +186,7 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
     html += '</table>'
     st.markdown(html, unsafe_allow_html=True)
 
+    # ナビゲーションボタン
     c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 2, 1.2, 1.2])
     with c1:
         if st.button("◀", key=f"prev_{state_key}"): move_month(state_key, -1)
@@ -179,6 +194,18 @@ def draw_calendar_area(now_full, country_code, state_key, country_tz):
         if st.button("今月", key=f"today_{state_key}"): reset_month(state_key, country_tz)
     with c5:
         if st.button("▶", key=f"next_{state_key}"): move_month(state_key, 1)
+
+    # 箇条書きイベントリストの表示
+    if monthly_events:
+        event_items = "".join([f'<div class="event-item">• {e}</div>' for e in monthly_events])
+        st.markdown(f"""
+        <div class="event-list-box">
+            <div class="event-list-title">📋 {view_date.month}月の主要イベント予定</div>
+            {event_items}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="event-list-box"><div class="event-item">予定されている主要イベントはありません。</div></div>', unsafe_allow_html=True)
 
 def move_month(key, delta):
     current = st.session_state[key]
@@ -212,7 +239,7 @@ def get_market_info(now, market_type):
     else:
         return "🔴 CLOSED (本日の取引終了)", "#fff1f0"
 
-# --- セッション状態 ---
+# --- セッション状態の初期化 ---
 if 'view_date_us' not in st.session_state:
     st.session_state.view_date_us = datetime.now(pytz.timezone('America/New_York')).date().replace(day=1)
 if 'view_date_jp' not in st.session_state:
@@ -226,12 +253,10 @@ now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 with col1:
     st.header("🇺🇸 米国株式市場")
     is_dst = now_ny.dst() != timedelta(0)
-    dst_label = "（サマータイム中）" if is_dst else "（非サマータイム：標準時）"
-    st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">{dst_label}</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="date-time-row"><span>{now_ny.strftime("%Y/%m/%d %H:%M:%S")}</span><span class="tz-label">({"サマータイム中" if is_dst else "標準時"})</span></div>', unsafe_allow_html=True)
     status, color = get_market_info(now_ny, "US")
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_ny, "US", "view_date_us", "America/New_York")
-    
     st.markdown(f'<div class="news-box"><div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_ny.strftime("%Y年%m月%d日")}）</div><div class="news-update-time">（最終更新：{now_ny.strftime("%Y/%m/%d %H:%M")}）</div><ul class="news-list"><li>雇用統計の結果を受けた市場の反応</li><li>FOMC議事録に見る利下げのタイミング</li><li>ハイテク株の決算発表に向けた動き</li><li>原油価格上昇によるインフレ懸念の再燃</li><li>大統領選に向けた支持率調査の最新動向</li></ul></div>', unsafe_allow_html=True)
 
 with col2:
@@ -240,5 +265,4 @@ with col2:
     status, color = get_market_info(now_jp, "JP")
     st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
     draw_calendar_area(now_jp, "JP", "view_date_jp", "Asia/Tokyo")
-    
     st.markdown(f'<div class="news-box"><div class="news-title">AIが選ぶ今週の政治経済ニュース10（{now_jp.strftime("%Y年%m月%d日")}）</div><div class="news-update-time">（最終更新：{now_jp.strftime("%Y/%m/%d %H:%M")}）</div><ul class="news-list"><li>日銀会合での追加利上げ議論の行方</li><li>春闘回答を受けた国内消費の回復見通し</li><li>円安進行に伴う介入警戒感の強まり</li><li>半導体関連株の国内投資拡大に関する最新報</li><li>総選挙に向けた各党の経済公約比較</li></ul></div>', unsafe_allow_html=True)
