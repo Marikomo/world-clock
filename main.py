@@ -29,34 +29,40 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- スタイル設定（余白削除・レスポンシブ） ---
+# --- スタイル設定（余白を徹底的に排除） ---
 st.markdown("""
 <style>
-    /* 1. 標準のヘッダーと余白を完全に消去 */
-    header[data-testid="stHeader"] { display: none !important; }
-    .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; }
+    /* 1. Streamlit標準のヘッダーと余白を完全にゼロにする */
+    [data-testid="stHeader"] { display: none !important; }
+    .block-container { 
+        padding-top: 0rem !important; 
+        padding-bottom: 0rem !important;
+        margin-top: -50px !important; /* さらに上に持ち上げる */
+    }
     [data-testid="stAppViewBlockContainer"] { padding-top: 0rem !important; }
-
-    /* 2. 言語切り替えボタンを右上に固定（フローティング） */
+    
+    /* 2. 言語切り替えボタンを右上に固定 */
     .lang-container {
-        position: absolute; top: 10px; right: 20px; z-index: 1000;
+        position: absolute; top: 0px; right: 20px; z-index: 1000;
     }
 
-    /* 3. 大タイトルのデザイン */
+    /* 3. 大タイトルのデザイン（上の余白を最小化） */
     .main-big-title {
         font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-size: 3.5rem; font-weight: 900; color: #111; text-align: center;
-        letter-spacing: -0.04em; margin-top: 20px; margin-bottom: 40px; line-height: 1.1;
+        letter-spacing: -0.04em; 
+        margin-top: 0px !important; 
+        margin-bottom: 30px; 
+        line-height: 1.1;
+        padding-top: 20px;
     }
 
-    /* 4. デスクトップとモバイルで表示を切り替えるCSS */
-    /* モバイル時 (タブを表示、左右並びを隠す) */
+    /* 4. レスポンシブ設定 */
     @media (max-width: 800px) {
         .main-big-title { font-size: 1.8rem; margin-bottom: 20px; }
         .desktop-only { display: none !important; }
         .mobile-only { display: block !important; }
     }
-    /* デスクトップ時 (タブを隠す、左右並びを表示) */
     @media (min-width: 801px) {
         .mobile-only { display: none !important; }
         .desktop-only { display: block !important; }
@@ -75,9 +81,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 言語切り替え（右上に配置）
+# 言語切り替え（位置をさらに上に調整）
 st.markdown('<div class="lang-container">', unsafe_allow_html=True)
-c_empty, c_lang = st.columns([10, 1])
+c_empty, c_lang = st.columns([10, 1.5])
 with c_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
@@ -87,7 +93,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # 大タイトル
 st.markdown('<div class="main-big-title">US/Japan Stock Market<br>Real-time Calendar</div>', unsafe_allow_html=True)
 
-# --- 市場データ取得 ---
+# --- 市場データ取得・表示 ---
 @st.cache_data(ttl=60)
 def get_market_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -107,12 +113,11 @@ for i, (name, d) in enumerate(p.items()):
     with m_cols[i]:
         st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["price"]:,.1f}</div><div class="{c}" style="font-size:0.75rem; font-weight:700;">{s}{abs(d["diff"]):.1f} ({d["pct"]:.2f}%)</div></div>', unsafe_allow_html=True)
 
-# --- 共通描画コンポーネント ---
+# --- カレンダー描画ロジック ---
 def get_market_status_ui(now, market_type):
     cc, th = ("US", holidays.CountryHoliday("US")) if market_type == "US" else ("JP", holidays.CountryHoliday("JP"))
     is_h = now.date() in th
     ot, ct = (now.replace(hour=9, minute=30, second=0), now.replace(hour=16, minute=0, second=0)) if market_type == "US" else (now.replace(hour=9, minute=0, second=0), now.replace(hour=15, minute=0, second=0))
-    # 次の開場計算 (簡易版)
     nx = now + timedelta(days=1); nx = nx.replace(hour=ot.hour, minute=ot.minute)
     cd = f"Next Open: {nx.strftime('%m/%d %H:%M')}"
     if not (0 <= now.weekday() <= 4) or is_h: return f"CLOSED ({'HOLIDAY' if is_h else 'WEEKEND'})<br><small>{cd}</small>", "#f9f9f9"
@@ -142,13 +147,12 @@ def draw_cal_ui(now_full, country_code, state_key, country_tz):
     with b2: st.button(L["today"], key=f"t_{state_key}_{country_code}")
     with b3: st.button(L["next"], key=f"n_{state_key}_{country_code}")
 
-# --- コンテンツ表示ロジック ---
+# --- デスクトップ/モバイル表示 ---
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
 
-# 1. デスクトップ表示 (左右に並べる)
 st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
 d_col_us, d_col_jp = st.columns(2, gap="large")
 with d_col_us:
@@ -163,7 +167,6 @@ with d_col_jp:
     draw_cal_ui(now_jp, "JP", "v_jp", "Asia/Tokyo")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 2. モバイル表示 (タブ切り替え)
 st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
 m_tab_us, m_tab_jp = st.tabs([L["us_market"], L["jp_market"]])
 with m_tab_us:
