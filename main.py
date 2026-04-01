@@ -31,28 +31,45 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（PC/スマホの出し分けを強化） ---
+# --- 3. スタイル設定（一行ヘッダーと余白排除） ---
 st.markdown(f"""
 <style>
+    /* Streamlit標準ヘッダーを非表示 */
     [data-testid="stHeader"] {{ display: none !important; }}
+    
+    /* メインエリアを最上部まで持ち上げる */
     .block-container {{ 
         padding-top: 0rem !important; 
         padding-bottom: 0rem !important;
-        margin-top: -50px !important; 
+        margin-top: -60px !important; 
     }}
-    
-    .lang-container {{ position: absolute; top: 0px; right: 20px; z-index: 1000; }}
 
-    .main-big-title {{
+    /* 一行ヘッダーのコンテナ */
+    .custom-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
+        background-color: white;
+        border-bottom: 1px solid #eee;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        margin-bottom: 20px;
+    }}
+
+    .header-logo-title {{
         font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 3.5rem; font-weight: 900; color: #111; text-align: center;
-        letter-spacing: -0.04em; margin-top: 0px !important; margin-bottom: 30px; 
-        line-height: 1.1; padding-top: 20px;
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: #111;
+        letter-spacing: -0.04em;
+        line-height: 1;
     }}
 
     /* PC・スマホの出し分け */
     @media (max-width: 800px) {{
-        .main-big-title {{ font-size: 1.8rem; margin-bottom: 20px; }}
+        .header-logo-title {{ font-size: 1.1rem; }}
         .desktop-view {{ display: none !important; }}
         .mobile-view {{ display: block !important; }}
     }}
@@ -61,6 +78,7 @@ st.markdown(f"""
         .desktop-view {{ display: block !important; }}
     }}
 
+    /* 共通コンポーネント */
     .indicator-box {{ border: 1px solid #ddd; padding: 10px; text-align: center; background-color: #fff; margin-bottom: 15px; }}
     .indicator-label {{ font-size: 0.75rem; color: #666; font-weight: 700; text-transform: uppercase; }}
     .indicator-value {{ font-size: 1.1rem; font-weight: 800; margin: 2px 0; color: #111; }}
@@ -73,19 +91,20 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 言語切り替え
-st.markdown('<div class="lang-container">', unsafe_allow_html=True)
-c_empty, c_lang = st.columns([10, 1.5])
-with c_lang:
-    new_lang = st.segmented_control("Language", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
+# --- 4. 一行ヘッダーの描画 ---
+# タイトルと言語ボタンを同じコンテナ内に配置
+header_col1, header_col2 = st.columns([8, 1.5])
+with header_col1:
+    st.markdown('<div class="header-logo-title">Stock Market Real-time</div>', unsafe_allow_html=True)
+with header_col2:
+    new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
         st.session_state.lang = new_lang
         st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="main-big-title">US/Japan Stock Market<br>Real-time Calendar</div>', unsafe_allow_html=True)
+st.markdown('<hr style="margin: 10px 0 20px 0; border: 0; border-top: 1px solid #eee;">', unsafe_allow_html=True)
 
-# --- 市場データ取得 ---
+# --- 5. 市場データ取得 ---
 @st.cache_data(ttl=60)
 def get_market_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -105,7 +124,7 @@ for i, (name, d) in enumerate(p.items()):
     with m_cols[i]:
         st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["price"]:,.1f}</div><div class="{c}" style="font-size:0.75rem; font-weight:700;">{s}{abs(d["diff"]):.1f} ({d["pct"]:.2f}%)</div></div>', unsafe_allow_html=True)
 
-# --- 共通描画コンポーネント ---
+# --- 6. 共通描画コンポーネント ---
 def get_market_status_ui(now, market_type):
     cc, th = ("US", holidays.CountryHoliday("US")) if market_type == "US" else ("JP", holidays.CountryHoliday("JP"))
     is_h = now.date() in th
@@ -115,18 +134,14 @@ def get_market_status_ui(now, market_type):
     if not (0 <= now.weekday() <= 4) or is_h: return f"CLOSED ({'HOLIDAY' if is_h else 'WEEKEND'})<br><small>{L['next_open']} {cd}</small>", "#f9f9f9"
     if now < ot: return f"WAITING... (Opens in {(ot-now).seconds//3600:02d}:{(ot-now).seconds//60%60:02d})", "#fffbe6"
     elif ot <= now < ct: return f"OPEN (Closes in {(ct-now).seconds//3600:02d}:{(ct-now).seconds//60%60:02d})", "#e6ffed"
-    else: return f"CLOSED (DAY END)<br><small>{cd}</small>", "#fff1f0"
+    else: return f"CLOSED (DAY END)<br><small>{L['next_open']} {cd}</small>", "#fff1f0"
 
 def draw_cal_ui(now_full, country_code, state_key, country_tz, suffix=""):
     view_date = st.session_state[state_key]
-    # 言語に合わせた年月表示
     date_label = view_date.strftime('%Y / %m') if st.session_state.lang == "JP" else view_date.strftime('%B %Y')
     st.markdown(f"<div style='font-weight:900; font-size:1.1rem; margin-bottom:5px;'>{date_label}</div>", unsafe_allow_html=True)
-    
     target_holidays = holidays.CountryHoliday(country_code)
     cal = calendar.monthcalendar(view_date.year, view_date.month)
-    
-    # 曜日ラベルの日本語化
     html = f'<table class="calendar-table"><tr><th>{L["sun"]}</th><th>{L["mon"]}</th><th>{L["tue"]}</th><th>{L["wed"]}</th><th>{L["thu"]}</th><th>{L["fri"]}</th><th>{L["sat"]}</th></tr>'
     for week in cal:
         html += '<tr>'
@@ -139,7 +154,6 @@ def draw_cal_ui(now_full, country_code, state_key, country_tz, suffix=""):
                 html += f'<td><span class="{cls}">{cnt}</span></td>'
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
-    
     b1, b2, b3 = st.columns([1, 1, 1])
     if b1.button(L["prev"], key=f"prev_{state_key}_{suffix}"):
         m, y = (view_date.month-1, view_date.year) if view_date.month > 1 else (12, view_date.year-1)
@@ -150,37 +164,36 @@ def draw_cal_ui(now_full, country_code, state_key, country_tz, suffix=""):
         m, y = (view_date.month+1, view_date.year) if view_date.month < 12 else (1, view_date.year+1)
         st.session_state[state_key] = date(y, m, 1); st.rerun()
 
-# --- レイアウト処理 ---
+# --- 7. レイアウト処理 ---
 tz_ny, tz_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 now_ny, now_jp = datetime.now(tz_ny), datetime.now(tz_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
 
-# CSSのクラスを使ってPC/モバイルを完全に分ける
-# 1. デスクトップ表示（左右並び）
+# デスクトップ表示
 st.markdown('<div class="desktop-view">', unsafe_allow_html=True)
 d_col_us, d_col_jp = st.columns(2, gap="large")
 with d_col_us:
     st.header(L["us_market"])
-    s, c = get_market_status_ui(now_ny, "US")
-    st.markdown(f'<div class="market-status" style="background-color: {c};">{s}</div>', unsafe_allow_html=True)
+    s_us, c_us = get_market_status_ui(now_ny, "US")
+    st.markdown(f'<div class="market-status" style="background-color: {c_us};">{s_us}</div>', unsafe_allow_html=True)
     draw_cal_ui(now_ny, "US", "v_us", "America/New_York", suffix="d")
 with d_col_jp:
     st.header(L["jp_market"])
-    s, c = get_market_status_ui(now_jp, "JP")
-    st.markdown(f'<div class="market-status" style="background-color: {c};">{s}</div>', unsafe_allow_html=True)
+    s_jp, c_jp = get_market_status_ui(now_jp, "JP")
+    st.markdown(f'<div class="market-status" style="background-color: {c_jp};">{s_jp}</div>', unsafe_allow_html=True)
     draw_cal_ui(now_jp, "JP", "v_jp", "Asia/Tokyo", suffix="d")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 2. モバイル表示（タブ切り替え）
+# モバイル表示
 st.markdown('<div class="mobile-view">', unsafe_allow_html=True)
 m_tab_us, m_tab_jp = st.tabs([L["us_market"], L["jp_market"]])
 with m_tab_us:
-    s, c = get_market_status_ui(now_ny, "US")
-    st.markdown(f'<div class="market-status" style="background-color: {c};">{s}</div>', unsafe_allow_html=True)
+    s_m_us, c_m_us = get_market_status_ui(now_ny, "US")
+    st.markdown(f'<div class="market-status" style="background-color: {c_m_us};">{s_m_us}</div>', unsafe_allow_html=True)
     draw_cal_ui(now_ny, "US", "v_us", "America/New_York", suffix="m")
 with m_tab_jp:
-    s, c = get_market_status_ui(now_jp, "JP")
-    st.markdown(f'<div class="market-status" style="background-color: {color};">{status}</div>', unsafe_allow_html=True)
+    s_m_jp, c_m_jp = get_market_status_ui(now_jp, "JP")
+    st.markdown(f'<div class="market-status" style="background-color: {c_m_jp};">{s_m_jp}</div>', unsafe_allow_html=True)
     draw_cal_ui(now_jp, "JP", "v_jp", "Asia/Tokyo", suffix="m")
 st.markdown('</div>', unsafe_allow_html=True)
