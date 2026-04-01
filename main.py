@@ -35,22 +35,25 @@ L = T[st.session_state.lang]
 # --- 3. スタイル設定 ---
 st.markdown(f"""
 <style>
+    /* ヘッダーと余白を完全にゼロにする */
     [data-testid="stHeader"] {{ display: none !important; }}
-    /* コンテナの余白を極限まで削る */
     .block-container {{ padding-top: 0rem !important; margin-top: -65px !important; }}
 
+    /* 一行ヘッダーのロゴタイトル */
     .header-logo-title {{
         font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 900; color: #111; letter-spacing: -0.04em;
     }}
 
+    /* 市場ステータスの巨大一行スタイル */
     .status-line {{
-        font-size: 1.8rem; font-weight: 900; padding: 15px; border: 1px solid #ddd;
+        font-size: 1.6rem; font-weight: 900; padding: 12px; border: 1px solid #ddd;
         border-left: 8px solid #111; background-color: #fff; margin-bottom: 20px;
         line-height: 1.2; display: flex; justify-content: flex-start; align-items: center; gap: 15px;
     }}
     .status-label {{ color: #111; }}
-    .status-next {{ font-size: 1.2rem; color: #666; font-weight: 700; }}
+    .status-next {{ font-size: 1.1rem; color: #666; font-weight: 700; }}
 
+    /* カレンダー設定 */
     .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; }}
     .calendar-table th {{ font-weight: 800; padding-bottom: 8px; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
@@ -59,13 +62,11 @@ st.markdown(f"""
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
     
-    /* モバイル表示の時にデスクトップ用の要素を隠すためのクラス */
+    /* モバイルでの調整 */
     @media (max-width: 800px) {{
-        .desktop-view {{ display: none !important; }}
-    }}
-    /* デスクトップ表示の時にモバイル用の要素を隠すためのクラス */
-    @media (min-width: 801px) {{
-        .mobile-view {{ display: none !important; }}
+        .header-logo-title {{ font-size: 1.1rem; }}
+        .status-line {{ font-size: 1.2rem; flex-direction: column; align-items: flex-start; gap: 5px; }}
+        .status-next {{ font-size: 0.9rem; }}
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -119,7 +120,7 @@ def get_market_status(now, m_type):
     else: st_text = L["closed"]; bg = "#fff1f0"
     return f'<div class="status-line" style="background-color: {bg};"><span class="status-label">{st_text}</span> <span class="status-next">{next_open_str}</span></div>'
 
-def draw_cal(now_full, cc, state_key, tz_name, suffix):
+def draw_cal(now_full, cc, state_key, tz_name):
     view = st.session_state[state_key]
     st.markdown(f"#### {view.strftime('%Y / %m' if st.session_state.lang=='JP' else '%B %Y')}")
     th = holidays.CountryHoliday(cc, years=view.year)
@@ -138,12 +139,12 @@ def draw_cal(now_full, cc, state_key, tz_name, suffix):
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
     b1, b2, b3 = st.columns(3)
-    if b1.button(L["prev_m"], key=f"p_{suffix}"):
+    if b1.button(L["prev_m"], key=f"p_{cc}"):
         m, y = (view.month-1, view.year) if view.month > 1 else (12, view.year-1)
         st.session_state[state_key] = date(y, m, 1); st.rerun()
-    if b2.button(L["today"], key=f"t_{suffix}"):
+    if b2.button(L["today"], key=f"t_{cc}"):
         st.session_state[state_key] = datetime.now(pytz.timezone(tz_name)).date().replace(day=1); st.rerun()
-    if b3.button(L["next_m"], key=f"n_{suffix}"):
+    if b3.button(L["next_m"], key=f"n_{cc}"):
         m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1)
         st.session_state[state_key] = date(y, m, 1); st.rerun()
 
@@ -153,27 +154,16 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# 【重要】デスクトップ（左右並び）とモバイル（タブ）を完全に分離して描画
-# まず、PC用レイアウト
-st.markdown('<div class="desktop-view">', unsafe_allow_html=True)
-d_col_us, d_col_jp = st.columns(2, gap="large")
-with d_col_us:
+# タブを使わず、シンプルなカラム（左右並び）にする
+# これにより、スマホでは自動的に縦並びになり、PCでは横並びになります
+col_us, col_jp = st.columns(2, gap="large")
+
+with col_us:
     st.header(L["us_market"])
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
-    draw_cal(n_ny, "US", "v_us", "America/New_York", "dus")
-with d_col_jp:
+    draw_cal(n_ny, "US", "v_us", "America/New_York")
+
+with col_jp:
     st.header(L["jp_market"])
     st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
-    draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo", "djp")
-st.markdown('</div>', unsafe_allow_html=True)
-
-# 次に、モバイル用レイアウト
-st.markdown('<div class="mobile-view">', unsafe_allow_html=True)
-m_us, m_jp = st.tabs([L["us_market"], L["jp_market"]])
-with m_us:
-    st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
-    draw_cal(n_ny, "US", "v_us", "America/New_York", "mus")
-with m_jp:
-    st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
-    draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo", "mjp")
-st.markdown('</div>', unsafe_allow_html=True)
+    draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo")
