@@ -32,7 +32,7 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定 ---
+# --- 3. スタイル設定（JavaScriptによる強制非表示を追加） ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
@@ -58,16 +58,28 @@ st.markdown(f"""
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
     
-    /* モバイル・デスクトップの出し分け */
+    /* PC・モバイル出し分け用クラス */
     @media (max-width: 800px) {{
         .desktop-only {{ display: none !important; }}
-        .status-line {{ font-size: 1.2rem; flex-direction: column; align-items: flex-start; gap: 5px; }}
-        .status-next {{ font-size: 0.9rem; }}
     }}
     @media (min-width: 801px) {{
         .mobile-only {{ display: none !important; }}
     }}
 </style>
+
+<script>
+    // デスクトップ表示のとき、タブ要素(st.tabs)を強制的に非表示にするスクリプト
+    const observer = new MutationObserver(() => {{
+        const isDesktop = window.innerWidth > 800;
+        const tabs = document.querySelector('.mobile-only [data-testid="stTabs"]');
+        if (isDesktop && tabs) {{
+            tabs.style.display = 'none';
+        }} else if (tabs) {{
+            tabs.style.display = 'block';
+        }}
+    }});
+    observer.observe(document.body, {{ childList: true, subtree: true }});
+</script>
 """, unsafe_allow_html=True)
 
 # --- 4. ヘッダー ---
@@ -104,24 +116,19 @@ for i, (name, d) in enumerate(prices.items()):
 # --- 6. 共通ロジック ---
 def get_market_status(now, m_type):
     cc, th = ("US", holidays.CountryHoliday("US")) if m_type == "US" else ("JP", holidays.CountryHoliday("JP"))
-    ot = time(9, 30) if m_type == "US" else time(9, 0)
-    ct = time(16, 0) if m_type == "US" else time(15, 0)
+    ot, ct = (time(9, 30), time(16, 0)) if m_type == "US" else (time(9, 0), time(15, 0))
     td = now.date()
     nx = td
     if now.time() >= ct or td.weekday() >= 5 or td in th:
         while True:
             nx += timedelta(days=1)
             if nx.weekday() < 5 and nx not in th: break
-    else: nx = td
     next_open_str = f"{L['next']}{nx.strftime('%m/%d')} {ot.strftime('%H:%M')}"
     if td.weekday() >= 5 or td in th:
         st_text = L["holiday"] if td in th else L["weekend"]; bg = "#f9f9f9"
-    elif now.time() < ot:
-        st_text = L["waiting"]; bg = "#fffbe6"
-    elif ot <= now.time() < ct:
-        st_text = L["open"]; bg = "#e6ffed"
-    else:
-        st_text = L["closed"]; bg = "#fff1f0"
+    elif now.time() < ot: st_text = L["waiting"]; bg = "#fffbe6"
+    elif ot <= now.time() < ct: st_text = L["open"]; bg = "#e6ffed"
+    else: st_text = L["closed"]; bg = "#fff1f0"
     return f'<div class="status-line" style="background-color: {bg};"><span class="status-label">{st_text}</span> <span class="status-next">{next_open_str}</span></div>'
 
 def draw_cal(now_full, cc, state_key, tz_name, suffix):
@@ -158,9 +165,8 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# CSSによる表示制御用のラッパー
+# デスクトップ専用エリア
 st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
-# デスクトップ用レイアウト
 d_col_us, d_col_jp = st.columns(2, gap="large")
 with d_col_us:
     st.header(L["us_market"])
@@ -172,8 +178,8 @@ with d_col_jp:
     draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo", "djp")
 st.markdown('</div>', unsafe_allow_html=True)
 
+# モバイル専用エリア (タブ)
 st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
-# モバイル用レイアウト (タブ)
 m_us, m_jp = st.tabs([L["us_market"], L["jp_market"]])
 with m_us:
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
