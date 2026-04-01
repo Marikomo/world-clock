@@ -10,14 +10,15 @@ from streamlit_autorefresh import st_autorefresh
 if 'lang' not in st.session_state:
     st.session_state.lang = "JP"
 
-# サイドバーで言語切り替え
-with st.sidebar:
-    st.session_state.lang = st.radio("Language / 言語", ["JP", "EN"], horizontal=True)
+# --- 基本設定 ---
+calendar.setfirstweekday(calendar.SUNDAY)
+st_autorefresh(interval=60000, key="data_refresh")
+st_autorefresh(interval=1000, key="clock_refresh")
+st.set_page_config(page_title="Stock Market Calendar", layout="wide")
 
-# テキスト辞書（中略：以前と同じものを維持）
+# テキスト辞書
 T = {
     "JP": {
-        "title": "📊 日/米 株式市場リアルタイムカレンダー",
         "us_market": "🇺🇸 米国株式市場",
         "jp_market": "🇯🇵 日本株式市場",
         "dst": "サマータイム中",
@@ -28,13 +29,12 @@ T = {
         "next_open": "次回の開場まで: ",
         "weekend": "週末",
         "holiday": "祝日",
-        "update": "最終更新：",
+        "event_title": "月のイベント",
         "prev": "◀",
         "next": "▶",
         "today": "今月"
     },
     "EN": {
-        "title": "📊 Japan/US Stock Market Real-time Calendar",
         "us_market": "🇺🇸 US Stock Market",
         "jp_market": "🇯🇵 Japan Stock Market",
         "dst": "Daylight Saving",
@@ -45,7 +45,7 @@ T = {
         "next_open": "Next Open in: ",
         "weekend": "Weekend",
         "holiday": "Holiday",
-        "update": "Last Update: ",
+        "event_title": "Events in ",
         "prev": "Prev",
         "next": "Next",
         "today": "Current"
@@ -53,49 +53,49 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 基本設定 ---
-calendar.setfirstweekday(calendar.SUNDAY)
-st_autorefresh(interval=60000, key="data_refresh")
-st_autorefresh(interval=1000, key="clock_refresh")
-st.set_page_config(page_title=L["title"], layout="wide")
-
-# --- スタイル設定（おしゃれヘッダータイトルの実装） ---
+# --- スタイル設定 ---
 st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1@1,500&display=swap" rel="stylesheet">
 <style>
-    body { color: #444; }
-    
-    /* ヘッダーのロゴ位置にタイトルを表示するためのスタイル */
-    [data-testid="stHeader"] {
+    /* ヘッダー全体の設定 */
+    header[data-testid="stHeader"] {
+        background-color: white;
+        height: 4rem;
         display: flex;
-        justify-content: flex-start;
         align-items: center;
-        padding-left: 15px;
+        padding: 0 2rem;
+        border-bottom: 1px solid #f0f2f6;
     }
     
-    /* ストリームリットのロゴ、その他アイコンを非表示 */
-    [data-testid="stHeader"] .viewerBadge_container__1QSob,
-    [data-testid="stHeader"] .main-svg,
-    [data-testid="stHeader"] header a,
-    [data-testid="stHeader"] .stHeaderActionElements,
-    [data-testid="stSidebar"] div:nth-child(1) button {
+    /* 既存のロゴやメニューを消去 */
+    header[data-testid="stHeader"] div:first-child, 
+    header[data-testid="stHeader"] .stHeaderActionElements {
         display: none !important;
     }
-    
-    /* 自作のヘッダータイトル */
+
+    /* ヘッダー内コンテンツの配置 */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
     .header-logo-title {
-        font-family: 'Playfair Display', serif; /* おしゃれフォント */
-        font-size: 1.0rem; /* ロゴサイズ */
-        color: #666; /* 目立ちすぎないグレー */
-        font-style: italic; /* 斜体でよりおしゃれに */
-        margin-right: auto; /* 左寄せ */
-        padding: 5px 10px;
-        line-height: 1;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.2rem;
+        color: #444;
+        font-style: italic;
         cursor: default;
     }
 
-    /* その他既存のスタイル */
+    /* メインコンテンツ前の大きな余白 */
+    .main-spacer {
+        margin-top: 80px;
+    }
+
+    /* 共通スタイル */
+    body { color: #444; }
     .indicator-box { border: 1px solid #ddd; padding: 10px; text-align: center; background-color: #fff; margin-bottom: 20px; }
     .indicator-label { font-size: 0.8rem; color: #888; font-weight: bold; }
     .indicator-value { font-size: 1.2rem; font-weight: bold; margin: 5px 0; }
@@ -110,6 +110,7 @@ st.markdown("""
     .tooltip-container { position: relative; display: inline-block; cursor: pointer; }
     .tooltip-text { visibility: hidden; width: max-content; background-color: #333; color: #fff; text-align: left; border-radius: 4px; padding: 6px 10px; position: absolute; z-index: 100; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.1s; font-size: 0.7rem; pointer-events: none; }
     .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+    .event-list-box { border: 1px solid #ddd; padding: 12px; margin-top: 10px; margin-bottom: 15px; background-color: #fafafa; }
     .news-box { border: 1px solid #ddd; padding: 15px; background-color: #fff; min-height: 280px; }
     .market-status { font-size: 1.1rem; font-weight: bold; padding: 10px; border: 1px solid #ddd; }
     .date-time-row { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
@@ -119,7 +120,29 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- ロジック関数 (中略：以前と同じものを維持) ---
+# --- ヘッダー要素の描画 ---
+# ヘッダー内にタイトルと切り替えボタンを配置（カスタムHTML）
+st.markdown(f"""
+    <div style="position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 999; padding: 10px 40px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+        <div class="header-logo-title">Stock Market Real-time Event Calendar</div>
+        <div id="lang-trigger"></div>
+    </div>
+""", unsafe_allow_html=True)
+
+# ヘッダー内の言語ボタンは、CSSで位置調整したStreamlitコンポーネントを使用
+with st.container():
+    h_col1, h_col2 = st.columns([8, 1])
+    with h_col2:
+        # ヘッダーの右端に来るようにボタンを配置
+        new_lang = st.segmented_control("Lang", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
+        if new_lang and new_lang != st.session_state.lang:
+            st.session_state.lang = new_lang
+            st.rerun()
+
+# メインコンテンツ開始前の大きな余白
+st.markdown('<div class="main-spacer"></div>', unsafe_allow_html=True)
+
+# --- 以降、ロジック・表示処理 ---
 @st.cache_data(ttl=60)
 def get_market_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -164,6 +187,7 @@ def draw_market_calendar(now_full, country_code, state_key, country_tz):
     st.markdown(f"### {view_date.strftime('%Y/%m' if st.session_state.lang == 'JP' else '%B %Y')}")
     target_holidays = holidays.CountryHoliday(country_code)
     cal = calendar.monthcalendar(view_date.year, view_date.month)
+    monthly_events = []
     html = f'<table class="calendar-table"><tr><th>{"Su" if st.session_state.lang == "EN" else "日"}</th><th>{"Mo" if st.session_state.lang == "EN" else "月"}</th><th>{"Tu" if st.session_state.lang == "EN" else "火"}</th><th>{"We" if st.session_state.lang == "EN" else "水"}</th><th>{"Th" if st.session_state.lang == "EN" else "木"}</th><th>{"Fr" if st.session_state.lang == "EN" else "金"}</th><th>{"Sa" if st.session_state.lang == "EN" else "土"}</th></tr>'
     for week in cal:
         html += '<tr>'
@@ -194,14 +218,7 @@ def draw_market_calendar(now_full, country_code, state_key, country_tz):
             if m > 12: m=1; y+=1
             st.session_state[state_key] = date(y, m, 1)
 
-# --- メイン実行 ---
-
-# おしゃれなヘッダータイトル（ロゴ位置）を強制挿入
-st.markdown('<div class="header-logo-title">Stock Market Real-time Event Calendar</div>', unsafe_allow_html=True)
-
-# メイン画面のタイトルは日英切り替え対応
-st.title(L["title"])
-
+# 指標表示
 p = get_market_prices()
 cols = st.columns(3)
 for i, (name, d) in enumerate(p.items()):
