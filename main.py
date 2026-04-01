@@ -32,14 +32,14 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（全要素を強制的に一行にする究極のCSS） ---
+# --- 3. スタイル設定（必要な場所だけ一行にする） ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
     .block-container {{ padding-top: 0rem !important; margin-top: -65px !important; }}
 
-    /* 【解決策1】全ての「横並びブロック」をスマホでも強制的に横並びにする */
-    [data-testid="stHorizontalBlock"] {{
+    /* 【修正の要】特定のコンテナの中だけを一行にする命令 */
+    .force-row-container [data-testid="stHorizontalBlock"] {{
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
@@ -48,19 +48,14 @@ st.markdown(f"""
         width: 100% !important;
         gap: 5px !important;
     }}
-    [data-testid="stHorizontalBlock"] > div {{
+    .force-row-container [data-testid="stHorizontalBlock"] > div {{
         width: 100% !important;
         flex: 1 1 0% !important;
         min-width: 0 !important;
     }}
 
-    /* ヘッダーの微調整 */
-    .header-logo-title {{ 
-        font-family: 'Inter', sans-serif; font-size: 1.1rem; font-weight: 900; 
-        color: #111; letter-spacing: -0.04em; white-space: nowrap; 
-    }}
+    .header-logo-title {{ font-family: 'Inter', sans-serif; font-size: 1.1rem; font-weight: 900; color: #111; letter-spacing: -0.04em; }}
 
-    /* 市場ステータス */
     .status-line {{
         font-size: 1.4rem; font-weight: 900; padding: 12px; border: 1px solid #ddd;
         border-left: 8px solid #111; background-color: #fff; margin-bottom: 15px;
@@ -68,29 +63,19 @@ st.markdown(f"""
     }}
     .status-next {{ font-size: 0.85rem; color: #666; font-weight: 700; }}
 
-    /* カレンダーヘッダー：フォントをInterに統一、背景なしDST */
-    .cal-info-header {{ 
-        display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; 
-        font-family: 'Inter', sans-serif; flex-wrap: nowrap;
-    }}
-    .cal-title, .cal-time {{ font-weight: 900; font-size: 1.1rem; color: #111; white-space: nowrap; }}
-    .cal-dst {{ font-size: 0.75rem; font-weight: 700; color: #666; white-space: nowrap; }}
+    .cal-info-header {{ display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-family: 'Inter', sans-serif; }}
+    .cal-title, .cal-time {{ font-weight: 900; font-size: 1.1rem; color: #111; }}
+    .cal-dst {{ font-size: 0.75rem; font-weight: 700; color: #666; }}
 
-    /* 価格ボード */
-    .indicator-box {{ 
-        border: 1px solid #ddd; padding: 8px 2px; text-align: center; 
-        background-color: #fff; height: 100%;
-    }}
+    .indicator-box {{ border: 1px solid #ddd; padding: 8px 2px; text-align: center; background-color: #fff; height: 100%; }}
     .indicator-label {{ font-size: 0.6rem; color: #666; font-weight: 700; }}
     .indicator-value {{ font-size: 0.9rem; font-weight: 900; }}
 
-    /* ボタンの高さと端揃え */
     .stButton > button {{
         border-radius: 0px !important; border: 1px solid #ccc !important;
         width: 100% !important; height: 38px; font-weight: 700; font-size: 0.75rem; padding: 0 !important;
     }}
 
-    /* カレンダーテーブル */
     .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; }}
     .calendar-table th {{ font-weight: 800; padding-bottom: 5px; font-size: 0.8rem; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
@@ -103,12 +88,12 @@ st.markdown(f"""
     @media (max-width: 600px) {{
         .header-logo-title {{ font-size: 0.85rem; }}
         .status-line {{ font-size: 1.0rem; }}
-        .cal-title, .cal-time {{ font-size: 0.95rem; }}
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ヘッダー（一行・左右振り分け） ---
+# --- 4. ヘッダー（一行固定） ---
+st.markdown('<div class="force-row-container">', unsafe_allow_html=True)
 h_col1, h_col2 = st.columns([6, 4])
 with h_col1:
     st.markdown('<div class="header-logo-title" style="margin-top:10px;">Stock Market Real-time</div>', unsafe_allow_html=True)
@@ -116,9 +101,10 @@ with h_col2:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
         st.session_state.lang = new_lang; st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('<hr style="margin: 0px 0 15px 0; border: 0; border-top: 1px solid #eee;">', unsafe_allow_html=True)
 
-# --- 5. 価格ボード（3つ一行） ---
+# --- 5. 価格ボード（一行固定） ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -132,12 +118,14 @@ def get_prices():
     return res
 
 prices = get_prices()
+st.markdown('<div class="force-row-container">', unsafe_allow_html=True)
 p_cols = st.columns(3)
 for i, (name, d) in enumerate(prices.items()):
     c_cls = "price-up" if d['diff'] >= 0 else "price-down"
     sym = "▲" if d['diff'] >= 0 else "▼"
     with p_cols[i]:
         st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["val"]:,.0f}</div><div class="{c_cls}" style="font-size:0.55rem; font-weight:700;">{sym}{abs(d["diff"]):.0f}</div></div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 6. 共通ロジック ---
 def get_market_status(now, m_type):
@@ -174,7 +162,8 @@ def draw_cal_section(now, cc, state_key, suffix):
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
     
-    # ボタン一行に3つ強制並び
+    # 操作ボタンも一行固定
+    st.markdown('<div class="force-row-container">', unsafe_allow_html=True)
     b_cols = st.columns(3)
     with b_cols[0]:
         if st.button(L["prev_m"], key=f"p_{suffix}"):
@@ -187,20 +176,22 @@ def draw_cal_section(now, cc, state_key, suffix):
         if st.button(L["next_m"], key=f"n_{suffix}"):
             m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1)
             st.session_state[state_key] = date(y, m, 1); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 7. 表示実行（デスクトップ2列 / モバイル自動1列） ---
+# --- 7. 表示実行（ここは一行に固定しない！） ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# この st.columns(2) はPC用。モバイルでは自動で縦に積まれます。
-# しかし、その中身（価格やボタン）は上記のCSSで一行を死守します。
+# この大枠のカラムは、モバイルでは縦、PCでは横に自動で分かれます。
 m_col1, m_col2 = st.columns(2, gap="large")
+
 with m_col1:
     st.header(L["us_market"])
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
     draw_cal_section(n_ny, "US", "v_us", "dus")
+
 with m_col2:
     st.header(L["jp_market"])
     st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
