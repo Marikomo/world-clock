@@ -42,25 +42,14 @@ st.markdown(f"""
         font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 900; color: #111; letter-spacing: -0.04em;
     }}
 
-    /* 市場ステータスの巨大一行スタイル */
     .status-line {{
-        font-size: 1.8rem; /* 大きく表示 */
-        font-weight: 900;
-        padding: 15px;
-        border: 1px solid #ddd;
-        border-left: 8px solid #111;
-        background-color: #fff;
-        margin-bottom: 20px;
-        line-height: 1.2;
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        gap: 15px;
+        font-size: 1.8rem; font-weight: 900; padding: 15px; border: 1px solid #ddd;
+        border-left: 8px solid #111; background-color: #fff; margin-bottom: 20px;
+        line-height: 1.2; display: flex; justify-content: flex-start; align-items: center; gap: 15px;
     }}
     .status-label {{ color: #111; }}
     .status-next {{ font-size: 1.2rem; color: #666; font-weight: 700; }}
 
-    /* カレンダー設定 */
     .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; }}
     .calendar-table th {{ font-weight: 800; padding-bottom: 8px; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
@@ -69,9 +58,14 @@ st.markdown(f"""
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
     
+    /* モバイル・デスクトップの出し分け */
     @media (max-width: 800px) {{
+        .desktop-only {{ display: none !important; }}
         .status-line {{ font-size: 1.2rem; flex-direction: column; align-items: flex-start; gap: 5px; }}
         .status-next {{ font-size: 0.9rem; }}
+    }}
+    @media (min-width: 801px) {{
+        .mobile-only {{ display: none !important; }}
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -113,28 +107,21 @@ def get_market_status(now, m_type):
     ot = time(9, 30) if m_type == "US" else time(9, 0)
     ct = time(16, 0) if m_type == "US" else time(15, 0)
     td = now.date()
-    
-    # 次の営業日を計算
     nx = td
     if now.time() >= ct or td.weekday() >= 5 or td in th:
         while True:
             nx += timedelta(days=1)
             if nx.weekday() < 5 and nx not in th: break
     else: nx = td
-    
     next_open_str = f"{L['next']}{nx.strftime('%m/%d')} {ot.strftime('%H:%M')}"
-    
-    # 状態判定
     if td.weekday() >= 5 or td in th:
-        st_text = L["holiday"] if td in th else L["weekend"]
-        bg = "#f9f9f9"
+        st_text = L["holiday"] if td in th else L["weekend"]; bg = "#f9f9f9"
     elif now.time() < ot:
         st_text = L["waiting"]; bg = "#fffbe6"
     elif ot <= now.time() < ct:
         st_text = L["open"]; bg = "#e6ffed"
     else:
         st_text = L["closed"]; bg = "#fff1f0"
-        
     return f'<div class="status-line" style="background-color: {bg};"><span class="status-label">{st_text}</span> <span class="status-next">{next_open_str}</span></div>'
 
 def draw_cal(now_full, cc, state_key, tz_name, suffix):
@@ -142,7 +129,6 @@ def draw_cal(now_full, cc, state_key, tz_name, suffix):
     st.markdown(f"#### {view.strftime('%Y / %m' if st.session_state.lang=='JP' else '%B %Y')}")
     th = holidays.CountryHoliday(cc, years=view.year)
     cal = calendar.monthcalendar(view.year, view.month)
-    
     html = f'<table class="calendar-table"><tr><th>{L["sun"]}</th><th>{L["mon"]}</th><th>{L["tue"]}</th><th>{L["wed"]}</th><th>{L["thu"]}</th><th>{L["fri"]}</th><th>{L["sat"]}</th></tr>'
     for w in cal:
         html += '<tr>'
@@ -156,7 +142,6 @@ def draw_cal(now_full, cc, state_key, tz_name, suffix):
                 html += f'<td><span class="{cls}">{txt}</span></td>'
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
-    
     b1, b2, b3 = st.columns(3)
     if b1.button(L["prev_m"], key=f"p_{suffix}"):
         m, y = (view.month-1, view.year) if view.month > 1 else (12, view.year-1)
@@ -173,21 +158,22 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# デスクトップ
-st.markdown('<div class="desktop-view">', unsafe_allow_html=True)
-c_us, c_jp = st.columns(2, gap="large")
-with c_us:
+# CSSによる表示制御用のラッパー
+st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
+# デスクトップ用レイアウト
+d_col_us, d_col_jp = st.columns(2, gap="large")
+with d_col_us:
     st.header(L["us_market"])
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
     draw_cal(n_ny, "US", "v_us", "America/New_York", "dus")
-with c_jp:
+with d_col_jp:
     st.header(L["jp_market"])
     st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
     draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo", "djp")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# モバイル
-st.markdown('<div class="mobile-view">', unsafe_allow_html=True)
+st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
+# モバイル用レイアウト (タブ)
 m_us, m_jp = st.tabs([L["us_market"], L["jp_market"]])
 with m_us:
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
