@@ -35,42 +35,54 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- スタイル設定（経済系シンプル・太字・大余白） ---
+# --- スタイル設定（余白を徹底的に削る） ---
 st.markdown("""
 <style>
-    /* ヘッダー全体の設定 */
-    header[data-testid="stHeader"] { background-color: white; height: 4rem; display: flex; align-items: center; padding: 0 1rem; border-bottom: 1px solid #f0f2f6; }
-    header[data-testid="stHeader"] div:first-child, header[data-testid="stHeader"] .stHeaderActionElements { display: none !important; }
+    /* Streamlit標準のメインエリア余白をゼロにする */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+    }
     
-    /* 経済系シンプルフォントのロゴタイトル */
+    /* ヘッダー全体の設定 */
+    header[data-testid="stHeader"] { 
+        background-color: white; 
+        height: 3.5rem; 
+        display: flex; 
+        align-items: center; 
+        padding: 0 1rem; 
+        border-bottom: 1px solid #f0f2f6; 
+    }
+    header[data-testid="stHeader"] div:first-child, 
+    header[data-testid="stHeader"] .stHeaderActionElements { 
+        display: none !important; 
+    }
+    
+    /* ヘッダータイトル */
     .header-logo-title { 
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
         font-weight: 800; 
-        font-size: 1.0rem; 
+        font-size: 0.9rem; 
         color: #222; 
-        letter-spacing: -0.02em;
     }
 
-    /* メインの大タイトル（経済系・極太・特大） */
+    /* メイン大タイトル（上のマージンを最小限に） */
     .main-big-title {
         font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-size: 3.5rem; /* さらに大きく */
-        font-weight: 900; /* 極太 */
+        font-size: 3.5rem;
+        font-weight: 900;
         color: #111;
         text-align: center;
-        letter-spacing: -0.04em; /* 文字間を詰めて力強く */
-        margin-top: 40px;
-        margin-bottom: 80px; /* 下の余白を特大に */
+        letter-spacing: -0.04em;
+        margin-top: 10px; /* ここを小さくしました */
+        margin-bottom: 50px; /* 下の余白も少し詰めました */
         line-height: 1.1;
     }
 
-    /* モバイル対応：タイトルのレスポンシブ設定 */
     @media (max-width: 640px) {
-        .main-big-title { font-size: 1.8rem; margin-bottom: 40px; }
+        .main-big-title { font-size: 1.8rem; margin-bottom: 30px; }
     }
 
-    .main-spacer { margin-top: 60px; }
-    
     /* 価格ボード */
     .indicator-box { border: 1px solid #ddd; padding: 10px; text-align: center; background-color: #fff; margin-bottom: 15px; }
     .indicator-label { font-size: 0.75rem; color: #666; font-weight: 700; text-transform: uppercase; }
@@ -78,7 +90,6 @@ st.markdown("""
     
     /* カレンダー操作ボタン */
     .stButton > button { border-radius: 0px !important; border: 1px solid #ccc !important; width: 100%; height: 38px; font-weight: 700; font-size: 0.85rem; background-color: #fff; color: #333; }
-    .stButton > button:hover { border-color: #111 !important; color: #111 !important; }
     
     /* カレンダーテーブル */
     .calendar-table { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.9rem; }
@@ -86,18 +97,15 @@ st.markdown("""
     .calendar-table tr { height: 40px; }
     .today-marker { background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; }
     
-    .price-up { color: #d71920; } /* 経済系らしい深めの赤 */
-    .price-down { color: #0050b3; } /* 経済系らしい深めの青 */
+    .price-up { color: #d71920; }
+    .price-down { color: #0050b3; }
     .market-status { font-size: 0.95rem; font-weight: 800; padding: 12px; border: 1px solid #ddd; margin-bottom: 15px; background-color: #fff; }
-    
-    /* 余白調整 */
-    [data-testid="column"] { padding-right: 20px !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- ヘッダー描画 ---
 st.markdown(f"""
-    <div style="position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 999; padding: 10px 25px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+    <div style="position: sticky; top: 0; width: 100%; background: white; z-index: 999; padding: 10px 25px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div class="header-logo-title">US/JP MARKET WATCH</div>
         <div id="lang-trigger"></div>
     </div>
@@ -110,8 +118,7 @@ with st.container():
         if new_lang and new_lang != st.session_state.lang:
             st.session_state.lang = new_lang; st.rerun()
 
-st.markdown('<div class="main-spacer"></div>', unsafe_allow_html=True)
-# 指定のタイトルを大きく太く
+# 大タイトル（マージンを削ったクラスを適用）
 st.markdown('<div class="main-big-title">US/Japan Stock Market<br>Real-time Calendar</div>', unsafe_allow_html=True)
 
 # --- 価格データ取得・表示 ---
