@@ -32,43 +32,37 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（ヘッダーの整列を強化） ---
+# --- 3. スタイル設定 ---
 st.markdown(f"""
 <style>
+    /* 標準要素の非表示と余白削除 */
     [data-testid="stHeader"] {{ display: none !important; }}
-    .block-container {{ padding-top: 0rem !important; margin-top: -60px !important; }}
+    .block-container {{ padding-top: 0rem !important; padding-bottom: 0rem !important; margin-top: -65px !important; }}
 
-    /* ヘッダー一行化・中央揃え・右寄せ */
-    .header-container {{
+    /* ヘッダー: タイトルと言語スイッチを一行で中央揃え */
+    .custom-header-container {{
         display: flex;
         justify-content: space-between;
         align-items: center; /* 垂直方向の中央揃え */
-        padding: 15px 0;
-        margin-bottom: 5px;
+        width: 100%;
+        padding: 10px 0;
     }}
-    
     .header-logo-title {{
         font-family: 'Inter', sans-serif;
-        font-size: 1.4rem;
+        font-size: 1.5rem;
         font-weight: 900;
         color: #111;
         letter-spacing: -0.04em;
         margin: 0;
         line-height: 1;
     }}
-
-    /* 言語切り替えボタンを右寄せ */
-    [data-testid="stHorizontalBlock"] {{
-        align-items: center !important; /* コンポーネント同士の垂直中央揃え */
-    }}
-    
-    .lang-wrapper {{
+    .lang-switcher-box {{
         display: flex;
-        justify-content: flex-end; /* 右寄せ */
-        width: 100%;
+        align-items: center;
+        justify-content: flex-end;
     }}
 
-    /* 市場ステータス一行化 */
+    /* 市場ステータスの巨大一行スタイル */
     .status-line {{
         font-size: 1.6rem; font-weight: 900; padding: 12px; border: 1px solid #ddd;
         border-left: 8px solid #111; background-color: #fff; margin-bottom: 15px;
@@ -77,29 +71,34 @@ st.markdown(f"""
     .status-label {{ color: #111; }}
     .status-next {{ font-size: 1.1rem; color: #666; font-weight: 700; }}
 
-    /* モバイルでも3列/一行を強制 */
+    /* モバイルでも3列/一行を強制する設定 */
     .force-row [data-testid="stHorizontalBlock"] {{
-        display: flex !important; flex-direction: row !important; align-items: center !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 10px !important;
     }}
     .force-row [data-testid="stHorizontalBlock"] > div {{
-        width: 100% !important; flex: 1 1 0% !important; min-width: 0 !important;
+        width: 100% !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
     }}
 
     /* 価格ボード */
     .indicator-box {{ 
         border: 1px solid #ddd; padding: 10px 2px; text-align: center; 
-        background-color: #fff; margin-bottom: 15px; 
+        background-color: #fff; margin-bottom: 10px; 
     }}
     .indicator-label {{ font-size: 0.75rem; color: #666; font-weight: 700; text-transform: uppercase; }}
     .indicator-value {{ font-size: 1.2rem; font-weight: 900; color: #111; }}
     
-    /* ボタンを一行に */
+    /* カレンダーボタン */
     .stButton > button {{ 
         border-radius: 0px !important; border: 1px solid #ccc !important; 
         width: 100%; height: 40px; font-weight: 700; font-size: 0.85rem; 
     }}
 
-    /* カレンダー */
+    /* カレンダーテーブル */
     .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }}
     .calendar-table th {{ font-weight: 800; padding-bottom: 8px; font-size: 0.9rem; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
@@ -110,27 +109,27 @@ st.markdown(f"""
     .market-section {{ margin-bottom: 50px; padding-bottom: 20px; border-bottom: 2px solid #eee; }}
 
     @media (max-width: 600px) {{
-        .header-logo-title {{ font-size: 1.0rem; }}
+        .header-logo-title {{ font-size: 1.1rem; }}
         .status-line {{ font-size: 1.2rem; gap: 5px; }}
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ヘッダー（垂直中央揃え・右寄せ） ---
-st.markdown('<div class="header-container">', unsafe_allow_html=True)
-h_col1, h_col2 = st.columns([7, 3])
-with h_col1:
+# --- 4. ヘッダー（タイトルと言語スイッチを一行・中央揃え・右寄せ） ---
+st.markdown('<div class="custom-header-container">', unsafe_allow_html=True)
+header_left, header_right = st.columns([7, 3])
+with header_left:
     st.markdown('<div class="header-logo-title">Stock Market Real-time</div>', unsafe_allow_html=True)
-with h_col2:
-    st.markdown('<div class="lang-wrapper">', unsafe_allow_html=True)
-    new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
+with header_right:
+    st.markdown('<div class="lang-switcher-box">', unsafe_allow_html=True)
+    new_lang = st.segmented_control("Language", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
         st.session_state.lang = new_lang; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('<hr style="margin: 0px 0 15px 0; border: 0; border-top: 1px solid #eee;">', unsafe_allow_html=True)
 
-# --- 5. 価格ボード（3列固定） ---
+# --- 5. 価格ボード（3列横並び固定） ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -204,18 +203,20 @@ def draw_cal(now_full, cc, state_key, tz_name):
             st.session_state[state_key] = date(y, m, 1); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 7. 表示実行（縦並び） ---
+# --- 7. 表示実行（完全縦並び） ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
+# 米国
 st.markdown('<div class="market-section">', unsafe_allow_html=True)
 st.header(L["us_market"])
 st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
 draw_cal(n_ny, "US", "v_us", "America/New_York")
 st.markdown('</div>', unsafe_allow_html=True)
 
+# 日本
 st.markdown('<div class="market-section">', unsafe_allow_html=True)
 st.header(L["jp_market"])
 st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
