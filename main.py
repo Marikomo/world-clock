@@ -32,29 +32,33 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（モバイルでも絶対一行化） ---
+# --- 3. スタイル設定（全要素を強制的に一行にする究極のCSS） ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
     .block-container {{ padding-top: 0rem !important; margin-top: -65px !important; }}
 
-    /* 【解決策】ヘッダー：Streamlitのカラムを使わず、HTML/CSSで一行を死守 */
-    .custom-header-flex {{
+    /* 【解決策1】全ての「横並びブロック」をスマホでも強制的に横並びにする */
+    [data-testid="stHorizontalBlock"] {{
         display: flex !important;
         flex-direction: row !important;
-        justify-content: space-between !important;
+        flex-wrap: nowrap !important;
         align-items: center !important;
+        justify-content: space-between !important;
         width: 100% !important;
-        padding: 15px 0 10px 0;
-        border-bottom: 1px solid #eee;
-        margin-bottom: 15px;
+        gap: 5px !important;
     }}
+    [data-testid="stHorizontalBlock"] > div {{
+        width: 100% !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+    }}
+
+    /* ヘッダーの微調整 */
     .header-logo-title {{ 
-        font-family: 'Inter', sans-serif; font-size: 1.15rem; font-weight: 900; 
-        color: #111; letter-spacing: -0.04em; white-space: nowrap; margin: 0;
+        font-family: 'Inter', sans-serif; font-size: 1.1rem; font-weight: 900; 
+        color: #111; letter-spacing: -0.04em; white-space: nowrap; 
     }}
-    /* 言語スイッチのコンテナ */
-    .lang-switcher-container {{ flex-shrink: 0; }}
 
     /* 市場ステータス */
     .status-line {{
@@ -64,33 +68,29 @@ st.markdown(f"""
     }}
     .status-next {{ font-size: 0.85rem; color: #666; font-weight: 700; }}
 
-    /* カレンダーヘッダー（フォント統一） */
-    .cal-info-header {{ display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-family: 'Inter', sans-serif; }}
-    .cal-title, .cal-time {{ font-weight: 900; font-size: 1.1rem; color: #111; }}
-    .cal-dst {{ font-size: 0.75rem; font-weight: 700; color: #666; }}
+    /* カレンダーヘッダー：フォントをInterに統一、背景なしDST */
+    .cal-info-header {{ 
+        display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; 
+        font-family: 'Inter', sans-serif; flex-wrap: nowrap;
+    }}
+    .cal-title, .cal-time {{ font-weight: 900; font-size: 1.1rem; color: #111; white-space: nowrap; }}
+    .cal-dst {{ font-size: 0.75rem; font-weight: 700; color: #666; white-space: nowrap; }}
 
-    /* 価格ボード：絶対一行 */
-    .indicator-wrapper {{
-        display: flex !important; flex-direction: row !important;
-        justify-content: space-between !important; gap: 5px !important; margin-bottom: 15px !important;
+    /* 価格ボード */
+    .indicator-box {{ 
+        border: 1px solid #ddd; padding: 8px 2px; text-align: center; 
+        background-color: #fff; height: 100%;
     }}
-    .indicator-box {{
-        flex: 1 !important; border: 1px solid #ddd; padding: 8px 2px; text-align: center; background-color: #fff;
-    }}
-    .indicator-label {{ font-size: 0.6rem; color: #666; font-weight: 700; text-transform: uppercase; }}
-    .indicator-value {{ font-size: 0.95rem; font-weight: 900; }}
+    .indicator-label {{ font-size: 0.6rem; color: #666; font-weight: 700; }}
+    .indicator-value {{ font-size: 0.9rem; font-weight: 900; }}
 
-    /* ボタン：絶対一行 */
-    .custom-btn-row {{
-        display: flex !important; flex-direction: row !important;
-        justify-content: space-between !important; gap: 5px !important; width: 100% !important;
-    }}
-    .custom-btn-row > div {{ flex: 1 !important; }}
+    /* ボタンの高さと端揃え */
     .stButton > button {{
         border-radius: 0px !important; border: 1px solid #ccc !important;
         width: 100% !important; height: 38px; font-weight: 700; font-size: 0.75rem; padding: 0 !important;
     }}
 
+    /* カレンダーテーブル */
     .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; }}
     .calendar-table th {{ font-weight: 800; padding-bottom: 5px; font-size: 0.8rem; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
@@ -98,27 +98,27 @@ st.markdown(f"""
     .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; font-weight: 800; }}
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
+    .market-section {{ margin-bottom: 30px; padding-bottom: 15px; border-bottom: 1px solid #eee; }}
 
     @media (max-width: 600px) {{
-        .header-logo-title {{ font-size: 0.9rem; }}
+        .header-logo-title {{ font-size: 0.85rem; }}
         .status-line {{ font-size: 1.0rem; }}
+        .cal-title, .cal-time {{ font-size: 0.95rem; }}
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. ヘッダー（完全一行・右寄せ固定） ---
-# HTMLで枠組みを作り、その中にStreamlitのコンポーネントを埋め込みます
-st.markdown('<div class="custom-header-flex">', unsafe_allow_html=True)
-header_cols = st.columns([6, 4])
-with header_cols[0]:
-    st.markdown('<div class="header-logo-title">Stock Market Real-time</div>', unsafe_allow_html=True)
-with header_cols[1]:
+# --- 4. ヘッダー（一行・左右振り分け） ---
+h_col1, h_col2 = st.columns([6, 4])
+with h_col1:
+    st.markdown('<div class="header-logo-title" style="margin-top:10px;">Stock Market Real-time</div>', unsafe_allow_html=True)
+with h_col2:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
         st.session_state.lang = new_lang; st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('<hr style="margin: 0px 0 15px 0; border: 0; border-top: 1px solid #eee;">', unsafe_allow_html=True)
 
-# --- 5. 価格ボード（絶対一行） ---
+# --- 5. 価格ボード（3つ一行） ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -132,18 +132,12 @@ def get_prices():
     return res
 
 prices = get_prices()
-p_html = '<div class="indicator-wrapper">'
-for name, d in prices.items():
+p_cols = st.columns(3)
+for i, (name, d) in enumerate(prices.items()):
     c_cls = "price-up" if d['diff'] >= 0 else "price-down"
     sym = "▲" if d['diff'] >= 0 else "▼"
-    p_html += f'''
-    <div class="indicator-box">
-        <div class="indicator-label">{name}</div>
-        <div class="indicator-value">{d["val"]:,.0f}</div>
-        <div class="{c_cls}" style="font-size:0.6rem; font-weight:700;">{sym}{abs(d["diff"]):.0f}</div>
-    </div>'''
-p_html += '</div>'
-st.markdown(p_html, unsafe_allow_html=True)
+    with p_cols[i]:
+        st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["val"]:,.0f}</div><div class="{c_cls}" style="font-size:0.55rem; font-weight:700;">{sym}{abs(d["diff"]):.0f}</div></div>', unsafe_allow_html=True)
 
 # --- 6. 共通ロジック ---
 def get_market_status(now, m_type):
@@ -163,7 +157,6 @@ def get_market_status(now, m_type):
 def draw_cal_section(now, cc, state_key, suffix):
     view = st.session_state[state_key]
     dst_txt = f'DST: {"サマータイム中" if now.dst() != timedelta(0) else "非サマータイム中"}' if cc == "US" else ""
-    # 時計のフォントを日付(Inter)と同じに設定
     st.markdown(f'''<div class="cal-info-header"><span class="cal-title">{now.strftime("%Y/%m/%d")}</span><span class="cal-time">{now.strftime("%H:%M:%S")}</span><span class="cal-dst">{dst_txt}</span></div>''', unsafe_allow_html=True)
     
     th = holidays.CountryHoliday(cc, years=view.year)
@@ -181,8 +174,7 @@ def draw_cal_section(now, cc, state_key, suffix):
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
     
-    # ボタン一行強制
-    st.markdown('<div class="custom-btn-row">', unsafe_allow_html=True)
+    # ボタン一行に3つ強制並び
     b_cols = st.columns(3)
     with b_cols[0]:
         if st.button(L["prev_m"], key=f"p_{suffix}"):
@@ -195,14 +187,15 @@ def draw_cal_section(now, cc, state_key, suffix):
         if st.button(L["next_m"], key=f"n_{suffix}"):
             m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1)
             st.session_state[state_key] = date(y, m, 1); st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 7. 表示実行 ---
+# --- 7. 表示実行（デスクトップ2列 / モバイル自動1列） ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
+# この st.columns(2) はPC用。モバイルでは自動で縦に積まれます。
+# しかし、その中身（価格やボタン）は上記のCSSで一行を死守します。
 m_col1, m_col2 = st.columns(2, gap="large")
 with m_col1:
     st.header(L["us_market"])
