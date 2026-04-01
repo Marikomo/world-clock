@@ -32,11 +32,12 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（JavaScriptによる強制非表示を追加） ---
+# --- 3. スタイル設定 ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
-    .block-container {{ padding-top: 0rem !important; margin-top: -60px !important; }}
+    /* コンテナの余白を極限まで削る */
+    .block-container {{ padding-top: 0rem !important; margin-top: -65px !important; }}
 
     .header-logo-title {{
         font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 900; color: #111; letter-spacing: -0.04em;
@@ -58,28 +59,15 @@ st.markdown(f"""
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
     
-    /* PC・モバイル出し分け用クラス */
+    /* モバイル表示の時にデスクトップ用の要素を隠すためのクラス */
     @media (max-width: 800px) {{
-        .desktop-only {{ display: none !important; }}
+        .desktop-view {{ display: none !important; }}
     }}
+    /* デスクトップ表示の時にモバイル用の要素を隠すためのクラス */
     @media (min-width: 801px) {{
-        .mobile-only {{ display: none !important; }}
+        .mobile-view {{ display: none !important; }}
     }}
 </style>
-
-<script>
-    // デスクトップ表示のとき、タブ要素(st.tabs)を強制的に非表示にするスクリプト
-    const observer = new MutationObserver(() => {{
-        const isDesktop = window.innerWidth > 800;
-        const tabs = document.querySelector('.mobile-only [data-testid="stTabs"]');
-        if (isDesktop && tabs) {{
-            tabs.style.display = 'none';
-        }} else if (tabs) {{
-            tabs.style.display = 'block';
-        }}
-    }});
-    observer.observe(document.body, {{ childList: true, subtree: true }});
-</script>
 """, unsafe_allow_html=True)
 
 # --- 4. ヘッダー ---
@@ -165,8 +153,9 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# デスクトップ専用エリア
-st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
+# 【重要】デスクトップ（左右並び）とモバイル（タブ）を完全に分離して描画
+# まず、PC用レイアウト
+st.markdown('<div class="desktop-view">', unsafe_allow_html=True)
 d_col_us, d_col_jp = st.columns(2, gap="large")
 with d_col_us:
     st.header(L["us_market"])
@@ -178,8 +167,8 @@ with d_col_jp:
     draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo", "djp")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# モバイル専用エリア (タブ)
-st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
+# 次に、モバイル用レイアウト
+st.markdown('<div class="mobile-view">', unsafe_allow_html=True)
 m_us, m_jp = st.tabs([L["us_market"], L["jp_market"]])
 with m_us:
     st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
