@@ -101,13 +101,15 @@ def get_prices():
 prices = get_prices()
 
 # --- 4. ヘッダー（絶対一行：HTMLとStreamlitの融合） ---
+# ここでタイトルと言語スイッチをHTMLのflexボックスに閉じ込めます
 st.markdown('<div class="absolute-row" style="border-bottom: 1px solid #eee; padding: 10px 0; margin-bottom: 10px;">', unsafe_allow_html=True)
-# 左側タイトル
 st.markdown('<div class="header-logo-title">Stock Market Real-time</div>', unsafe_allow_html=True)
-# 右側スイッチ（スイッチだけStreamlitの機能を使う）
-new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
-if new_lang and new_lang != st.session_state.lang:
-    st.session_state.lang = new_lang; st.rerun()
+# スイッチだけはStreamlitの機能を使うため、空のカラムを右に配置
+_, lang_col = st.columns([7, 3])
+with lang_col:
+    new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
+    if new_lang and new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang; st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 5. 価格ボード（HTMLで一行を完全固定） ---
@@ -134,9 +136,10 @@ def get_market_status(now, m_type):
         while True:
             nx += timedelta(days=1)
             if nx.weekday() < 5 and nx not in th: break
+    next_open_str = f"{L['next']}{nx.strftime('%m/%d %H:%M')}"
     st_text = L["open"] if (ot <= now.time() < ct and td.weekday() < 5 and td not in th) else (L["holiday"] if (td.weekday() >= 5 or td in th) else L["closed"])
     bg = "#e6ffed" if st_text == L["open"] else ("#f9f9f9" if st_text == L["holiday"] else "#fff1f0")
-    return f'<div class="status-line" style="background-color: {bg};"><span>{st_text}</span><span class="status-next">{L["next"]}{nx.strftime("%m/%d %H:%M")}</span></div>'
+    return f'<div class="status-line" style="background-color: {bg};"><span>{st_text}</span><span class="status-next">{next_open_str}</span></div>'
 
 def draw_cal(now, cc, state_key, suffix):
     view = st.session_state[state_key]
@@ -181,7 +184,7 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# PCでは左右並び、モバイルでは自動縦積みを活かす大枠のカラム
+# この大枠のカラムは、モバイルでは縦、PCでは横に自動で分かれます
 c_main1, c_main2 = st.columns(2, gap="large")
 with c_main1:
     st.header(L["us_m"])
