@@ -32,7 +32,7 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 3. スタイル設定（モバイル強制横並び） ---
+# --- 3. スタイル設定 ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
@@ -50,14 +50,14 @@ st.markdown(f"""
 
     /* 市場ステータス一行化 */
     .status-line {{
-        font-size: 1.4rem; font-weight: 900; padding: 10px; border: 1px solid #ddd;
-        border-left: 8px solid #111; background-color: #fff; margin-bottom: 20px;
-        line-height: 1.2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+        font-size: 1.6rem; font-weight: 900; padding: 12px; border: 1px solid #ddd;
+        border-left: 8px solid #111; background-color: #fff; margin-bottom: 15px;
+        line-height: 1.2; display: flex; flex-wrap: wrap; align-items: center; gap: 15px;
     }}
     .status-label {{ color: #111; }}
-    .status-next {{ font-size: 1.0rem; color: #666; font-weight: 700; }}
+    .status-next {{ font-size: 1.1rem; color: #666; font-weight: 700; }}
 
-    /* モバイルでも3列/一行を強制する魔法のCSS */
+    /* モバイル・デスクトップ共通：横並び要素の強制一行化 */
     [data-testid="stHorizontalBlock"] {{
         display: flex !important; flex-direction: row !important; align-items: flex-start !important;
     }}
@@ -67,32 +67,36 @@ st.markdown(f"""
 
     /* 価格ボード */
     .indicator-box {{ 
-        border: 1px solid #ddd; padding: 8px 2px; text-align: center; 
-        background-color: #fff; margin-bottom: 10px; 
+        border: 1px solid #ddd; padding: 10px 2px; text-align: center; 
+        background-color: #fff; margin-bottom: 15px; 
     }}
-    .indicator-label {{ font-size: 0.65rem; color: #666; font-weight: 700; overflow: hidden; white-space: nowrap; }}
-    .indicator-value {{ font-size: 0.9rem; font-weight: 900; color: #111; }}
+    .indicator-label {{ font-size: 0.75rem; color: #666; font-weight: 700; text-transform: uppercase; }}
+    .indicator-value {{ font-size: 1.2rem; font-weight: 900; color: #111; }}
     
     /* ボタンを一行に */
     .stButton > button {{ 
         border-radius: 0px !important; border: 1px solid #ccc !important; 
-        width: 100%; height: 35px; font-weight: 700; font-size: 0.75rem; 
-        padding: 0 !important;
+        width: 100%; height: 40px; font-weight: 700; font-size: 0.85rem; 
     }}
 
     /* カレンダー */
-    .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.8rem; }}
-    .calendar-table th {{ font-weight: 800; padding-bottom: 5px; }}
+    .calendar-table {{ font-family: sans-serif; text-align: center; width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }}
+    .calendar-table th {{ font-weight: 800; padding-bottom: 8px; font-size: 0.9rem; }}
     .calendar-table th:first-child, .calendar-table th:last-child {{ color: #d71920; }}
+    .calendar-table td {{ font-size: 1rem; }}
     .holiday-red {{ color: #d71920 !important; font-weight: 800; }}
-    .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-weight: 800; }}
+    .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; font-weight: 800; }}
     
     .price-up {{ color: #d71920; }} .price-down {{ color: #0050b3; }}
 
+    /* セクションの区切り */
+    .market-section {{ margin-bottom: 50px; padding-bottom: 20px; border-bottom: 2px solid #eee; }}
+
     @media (max-width: 600px) {{
-        .header-logo-title {{ font-size: 1.0rem; }}
-        .status-line {{ font-size: 1.1rem; gap: 5px; }}
-        .status-next {{ font-size: 0.8rem; }}
+        .header-logo-title {{ font-size: 1.1rem; }}
+        .status-line {{ font-size: 1.2rem; gap: 5px; }}
+        .status-next {{ font-size: 0.9rem; }}
+        .main-big-title {{ font-size: 1.5rem; }}
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -103,14 +107,13 @@ h_col_left, h_col_right = st.columns([7, 3])
 with h_col_left:
     st.markdown('<div class="header-logo-title">Stock Market Real-time</div>', unsafe_allow_html=True)
 with h_col_right:
-    # 右揃えにするためにコンテナを使用
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang:
         st.session_state.lang = new_lang; st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('<hr style="margin: 5px 0 15px 0; border: 0; border-top: 1px solid #eee;">', unsafe_allow_html=True)
 
-# --- 5. 価格ボード（モバイル3列強制） ---
+# --- 5. 価格ボード（3列固定） ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = { "S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X" }
@@ -128,7 +131,7 @@ p_cols = st.columns(3)
 for i, (name, d) in enumerate(prices.items()):
     c, s = ("price-up", "▲") if d['diff'] >= 0 else ("price-down", "▼")
     with p_cols[i]:
-        st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["val"]:,.0f}</div><div class="{c}" style="font-size:0.6rem; font-weight:700;">{s}{abs(d["diff"]):.0f}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="indicator-box"><div class="indicator-label">{name}</div><div class="indicator-value">{d["val"]:,.0f}</div><div class="{c}" style="font-size:0.75rem; font-weight:700;">{s}{abs(d["diff"]):.1f} ({d["pct"]:.2f}%)</div></div>', unsafe_allow_html=True)
 
 # --- 6. 共通ロジック ---
 def get_market_status(now, m_type):
@@ -150,7 +153,7 @@ def get_market_status(now, m_type):
 
 def draw_cal(now_full, cc, state_key, tz_name):
     view = st.session_state[state_key]
-    st.markdown(f"<div style='font-weight:900; font-size:1.0rem; margin-bottom:5px;'>{view.strftime('%Y / %m' if st.session_state.lang=='JP' else '%B %Y')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-weight:900; font-size:1.4rem; margin-bottom:10px;'>{view.strftime('%Y / %m' if st.session_state.lang=='JP' else '%B %Y')}</div>", unsafe_allow_html=True)
     th = holidays.CountryHoliday(cc, years=view.year)
     cal = calendar.monthcalendar(view.year, view.month)
     html = f'<table class="calendar-table"><tr><th>{L["sun"]}</th><th>{L["mon"]}</th><th>{L["tue"]}</th><th>{L["wed"]}</th><th>{L["thu"]}</th><th>{L["fri"]}</th><th>{L["sat"]}</th></tr>'
@@ -167,8 +170,7 @@ def draw_cal(now_full, cc, state_key, tz_name):
         html += '</tr>'
     st.markdown(html + '</table>', unsafe_allow_html=True)
     
-    # 矢印と今月ボタンをモバイルでも一行に強制
-    b_cols = st.columns([1, 1.5, 1])
+    b_cols = st.columns([1, 1, 1])
     with b_cols[0]:
         if st.button(L["prev_m"], key=f"p_{cc}"):
             m, y = (view.month-1, view.year) if view.month > 1 else (12, view.year-1)
@@ -181,21 +183,22 @@ def draw_cal(now_full, cc, state_key, tz_name):
             m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1)
             st.session_state[state_key] = date(y, m, 1); st.rerun()
 
-# --- 7. 表示実行 ---
+# --- 7. 表示実行（縦並び） ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-# PCでは左右、スマホでは縦に並ぶが、各要素内（価格、ボタン）は一行を維持
-col_us, col_jp = st.columns(2, gap="large")
+# 【米国市場セクション】
+st.markdown('<div class="market-section">', unsafe_allow_html=True)
+st.header(L["us_market"])
+st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
+draw_cal(n_ny, "US", "v_us", "America/New_York")
+st.markdown('</div>', unsafe_allow_html=True)
 
-with col_us:
-    st.header(L["us_market"])
-    st.markdown(get_market_status(n_ny, "US"), unsafe_allow_html=True)
-    draw_cal(n_ny, "US", "v_us", "America/New_York")
-
-with col_jp:
-    st.header(L["jp_market"])
-    st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
-    draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo")
+# 【日本市場セクション】
+st.markdown('<div class="market-section">', unsafe_allow_html=True)
+st.header(L["jp_market"])
+st.markdown(get_market_status(n_jp, "JP"), unsafe_allow_html=True)
+draw_cal(n_jp, "JP", "v_jp", "Asia/Tokyo")
+st.markdown('</div>', unsafe_allow_html=True)
