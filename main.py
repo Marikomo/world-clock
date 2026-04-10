@@ -13,7 +13,7 @@ st_autorefresh(interval=60000, key="data_refresh")
 st_autorefresh(interval=1000, key="clock_refresh")
 st.set_page_config(page_title="Market Analytics Dashboard", layout="wide")
 
-# 祝日データを取得
+# 祝日データの完全分離
 US_HOLIDAYS = holidays.US()
 JP_HOLIDAYS = holidays.Japan()
 
@@ -37,32 +37,11 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 時刻取得 (日本から13時間戻して米国時間を生成) ---
-now_jp_raw = datetime.now(pytz.timezone('Asia/Tokyo'))
-now_ny_raw = now_jp_raw - timedelta(hours=13)
-now_ny = now_ny_raw.replace(tzinfo=None)
-now_jp = now_jp_raw.replace(tzinfo=None)
+# --- 2. 物理的な時刻取得 (JST基準で13時間戻してEDT生成) ---
+now_jp = datetime.now(pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+now_ny = (now_jp - timedelta(hours=13))
 
-# --- 3. イベントデータの完全分離 ---
-EVENTS_LIST = {
-    "US": {
-        "2026-04-10": "🇺🇸 米CPI発表",
-        "2026-04-30": "🇺🇸 FOMC政策金利発表",
-        "2026-05-01": "🇺🇸 米雇用統計"
-    },
-    "JP": {
-        "2026-04-28": "🇯🇵 日銀政策決定会合",
-        "2026-04-29": "🇯🇵 昭和の日",
-        "2026-05-03": "🇯🇵 憲法記念日"
-    }
-}
-
-AI_NEWS = {
-    "US": [f"{i+1}. NVIDIA/OpenAI等 米国AI最新ニュース {i+1}" for i in range(10)],
-    "JP": [f"{i+1}. ソフトバンク/さくら等 日本AI最新ニュース {i+1}" for i in range(10)]
-}
-
-# --- 4. CSS (デザイナー仕様: 正確な配色と余白) ---
+# --- 3. CSS (正確な配色とタイポグラフィ) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -93,7 +72,7 @@ with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
-# --- 5. 価格データ ---
+# --- 価格ボード ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = {"S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X"}
@@ -105,79 +84,102 @@ def get_prices():
         except: res[k] = {"val": 0, "diff": 0}
     return res
 prices = get_prices()
-
-p_cols = st.columns(3)
+pc = st.columns(3)
 for i, (k, v) in enumerate(prices.items()):
-    with p_cols[i]:
+    with pc[i]:
         st.markdown(f'<div class="price-box"><div style="font-weight:900;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-# --- 6. メインレイアウト ---
+# セッション状態初期化
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
 
-c1, c2 = st.columns(2, gap="medium")
-# ループ内でccに応じた祝日とイベントを確実に割り当てる
-for col, now, cc, s_key, suffix, title, h_data in [
-    (c1, now_ny, "US", "v_us", "us", L["us_m"], US_HOLIDAYS), 
-    (c2, now_jp, "JP", "v_jp", "jp", L["jp_m"], JP_HOLIDAYS)
-]:
-    with col:
-        st.header(title)
-        ot, ct = (time(9, 30), time(16, 0)) if cc=="US" else (time(9, 0), time(15, 0))
-        is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_data)
-        
-        # カウントダウン
-        target = datetime.combine(now.date(), ot)
-        if now.time() >= ot or now.date() in h_data or now.weekday() >= 5:
-            while True:
-                target += timedelta(days=1)
-                if target.weekday() < 5 and target.date() not in h_data: break
-        delta = target - now
-        h_c, r_c = divmod(delta.seconds, 3600); m_c, _ = divmod(r_c, 60)
-        c_down = f"あと{delta.days}日 {h_c:02d}:{m_c:02d}" if delta.days > 0 else f"あと{h_c}時間{m_c}分"
-        
-        st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op else "#fff5f5"};">{L["open"] if is_op else L["closed"]} <span style="float:right; font-size:0.75rem; color:#666;">{"" if is_op else L["next_prefix"]+c_down}</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"] if cc=="US" else ""}</span></div>', unsafe_allow_html=True)
-        
-        # --- カレンダー (土曜=青, 日祝=赤) ---
-        view = st.session_state[s_key]
-        cal = calendar.monthcalendar(view.year, view.month)
-        h_table = f'<table class="calendar-table"><tr>'
-        for i, d_n in enumerate([L["sun"],L["mon"],L["tue"],L["wed"],L["thu"],L["fri"],L["sat"]]):
-            color = "#d71920" if i==0 else ("#0050b3" if i==6 else "#000")
-            h_table += f'<th style="color:{color} !important;">{d_n}</th>'
-        h_table += '</tr>'
-        for w in cal:
-            h_table += '<tr>'
-            for i, d in enumerate(w):
-                if d == 0: h_table += '<td></td>'
-                else:
-                    curr_d = date(view.year, view.month, d)
-                    # 米国・日本それぞれの祝日ライブラリ (h_data) を参照
-                    if i == 0 or curr_d in h_data: d_color = "#d71920"
-                    elif i == 6: d_color = "#0050b3"
-                    else: d_color = "#000000"
-                    
-                    d_ui = f'<span class="today-marker">{d}</span>' if curr_d == now.date() else str(d)
-                    h_table += f'<td><span style="color:{d_color} !important; font-weight:800;">{d_ui}</span></td>'
-            h_table += '</tr>'
-        st.markdown(h_table + '</table>', unsafe_allow_html=True)
+# --- レイアウト構築 ---
+c_left, c_right = st.columns(2, gap="medium")
 
-        bc = st.columns(3)
-        with bc[0]: st.button(L["prev"], key=f"p_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=1)-timedelta(days=1)).replace(day=1)}))
-        with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=s_key: st.session_state.update({k: date.today().replace(day=1)}))
-        with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=28)+timedelta(days=5)).replace(day=1)}))
+# ==========================================
+# 🇺🇸 米国市場セクション (完全独立)
+# ==========================================
+with c_left:
+    st.header(L["us_m"])
+    ot_u, ct_u = (time(9, 30), time(16, 0))
+    is_op_u = (ot_u <= now_ny.time() < ct_u and now_ny.weekday() < 5 and now_ny.date() not in US_HOLIDAYS)
+    
+    st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_u else "#fff5f5"};">{L["open"] if is_op_u else L["closed"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_ny.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"]}</span></div>', unsafe_allow_html=True)
 
-        # --- イベント表示 (ccに応じて US/JP を出し分け) ---
-        with st.container(border=True):
-            st.markdown(f'<div class="box-header">{view.month}月 {L["event_title"]}</div>', unsafe_allow_html=True)
-            v_str = view.strftime("%Y-%m")
-            # EVENTS_LIST[cc] から該当する市場のデータのみを抽出
-            m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_LIST[cc].items()) if k.startswith(v_str)]
-            st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev) if m_ev else "予定なし") + '</div>', unsafe_allow_html=True)
+    # 米国カレンダー
+    v_u = st.session_state.v_us
+    cal_u = calendar.monthcalendar(v_u.year, v_u.month)
+    h_tab_u = f'<table class="calendar-table"><tr>'
+    for i, d_n in enumerate([L["sun"],L["mon"],L["tue"],L["wed"],L["thu"],L["fri"],L["sat"]]):
+        color = "#d71920" if i==0 else ("#0050b3" if i==6 else "#000")
+        h_tab_u += f'<th style="color:{color} !important;">{d_n}</th>'
+    h_tab_u += '</tr>'
+    for row in cal_u:
+        h_tab_u += '<tr>'
+        for i, d in enumerate(row):
+            if d == 0: h_tab_u += '<td></td>'
+            else:
+                curr = date(v_u.year, v_u.month, d)
+                d_c = "#d71920" if (i==0 or curr in US_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
+                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_ny.date() else str(d)
+                h_tab_u += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
+        h_tab_u += '</tr>'
+    st.markdown(h_tab_u + '</table>', unsafe_allow_html=True)
+    
+    # 米国ボタン
+    bu = st.columns(3)
+    with bu[0]: st.button(L["prev"], key="p_u", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=1)-timedelta(days=1)).replace(day=1)}))
+    with bu[1]: st.button(L["today"], key="t_u", on_click=lambda: st.session_state.update({"v_us": date.today().replace(day=1)}))
+    with bu[2]: st.button(L["next_m"], key="n_u", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=28)+timedelta(days=5)).replace(day=1)}))
 
-        # --- ニュース ---
-        with st.container(border=True):
-            st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
-            n_items = "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS[cc]])
-            st.markdown(f'<div style="height:250px; overflow-y:auto;">{n_items}</div>', unsafe_allow_html=True)
+    # 米国イベント
+    with st.container(border=True):
+        st.markdown(f'<div class="box-header">{v_u.month}月 米国イベント</div>', unsafe_allow_html=True)
+        e_u = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
+        m_ev_u = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(e_u.items()) if k.startswith(v_u.strftime("%Y-%m"))]
+        st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev_u) if m_ev_u else "予定なし") + '</div>', unsafe_allow_html=True)
+
+# ==========================================
+# 🇯🇵 日本市場セクション (完全独立)
+# ==========================================
+with c_right:
+    st.header(L["jp_m"])
+    ot_j, ct_j = (time(9, 0), time(15, 0))
+    is_op_j = (ot_j <= now_jp.time() < ct_j and now_jp.weekday() < 5 and now_jp.date() not in JP_HOLIDAYS)
+    
+    st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_j else "#fff5f5"};">{L["open"] if is_op_j else L["closed"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_jp.strftime("%Y/%m/%d %H:%M:%S")}</div>', unsafe_allow_html=True)
+
+    # 日本カレンダー
+    v_j = st.session_state.v_jp
+    cal_j = calendar.monthcalendar(v_j.year, v_j.month)
+    h_tab_j = f'<table class="calendar-table"><tr>'
+    for i, d_n in enumerate([L["sun"],L["mon"],L["tue"],L["wed"],L["thu"],L["fri"],L["sat"]]):
+        color = "#d71920" if i==0 else ("#0050b3" if i==6 else "#000")
+        h_tab_j += f'<th style="color:{color} !important;">{d_n}</th>'
+    h_tab_j += '</tr>'
+    for row in cal_j:
+        h_tab_j += '<tr>'
+        for i, d in enumerate(row):
+            if d == 0: h_tab_j += '<td></td>'
+            else:
+                curr = date(v_j.year, v_j.month, d)
+                d_c = "#d71920" if (i==0 or curr in JP_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
+                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_jp.date() else str(d)
+                h_tab_j += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
+        h_tab_j += '</tr>'
+    st.markdown(h_tab_j + '</table>', unsafe_allow_html=True)
+    
+    # 日本ボタン
+    bj = st.columns(3)
+    with bj[0]: st.button(L["prev"], key="p_j", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=1)-timedelta(days=1)).replace(day=1)}))
+    with bj[1]: st.button(L["today"], key="t_j", on_click=lambda: st.session_state.update({"v_jp": date.today().replace(day=1)}))
+    with bj[2]: st.button(L["next_m"], key="n_j", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=28)+timedelta(days=5)).replace(day=1)}))
+
+    # 日本イベント
+    with st.container(border=True):
+        st.markdown(f'<div class="box-header">{v_j.month}月 日本イベント</div>', unsafe_allow_html=True)
+        e_j = {"2026-04-28": "🇯🇵 日銀発表", "2026-04-29": "🇯🇵 昭和の日", "2026-05-03": "🇯🇵 憲法記念日"}
+        m_ev_j = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(e_j.items()) if k.startswith(v_j.strftime("%Y-%m"))]
+        st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev_j) if m_ev_j else "予定なし") + '</div>', unsafe_allow_html=True)
