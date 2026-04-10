@@ -36,14 +36,7 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. ニュース・イベントデータ ---
-AI_NEWS_DATA = {
-    "US": ["1. NVIDIA: Blackwell量産開始", "2. OpenAI: GPT-5 プレビュー期待", "3. Microsoft: 日本国内AI投資加速", "4. Google: Gemini 1.5 アップデート", "5. Meta: Llama-4 学習リソース拡大", "6. Apple: WWDCでのAI発表に注目", "7. Amazon: AIチップ内製化進展", "8. Tesla: FSD予測精度向上", "9. AMD: AIサーバーシェア拡大", "10. Intel: AI PCチップ出荷"],
-    "JP": ["1. SBG: 孫会長、AI投資10兆円枠", "2. さくらネット: GPUクラウド完売", "3. NTT: tsuzumi導入企業急増", "4. 富士通: 創薬AI世界1位の精度", "5. NEC: 官公庁AI案件を受注", "6. LINEヤフー: AI検索機能を刷新", "7. 三菱UFJ: 全行員AIアシスタント", "8. トヨタ: レベル4自動運転試験", "9. 楽天: AI統合戦略が加速", "10. 日本政府: 国産AIへの追加支援"]
-}
-EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
-
-# --- 3. CSS ---
+# --- 2. CSS (タイポグラフィの強弱を徹底) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -61,30 +54,27 @@ st.markdown(f"""
     .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; border: 1px solid #cccccc; table-layout: fixed; }}
     .calendar-table th, .calendar-table td {{ border: 1px solid #cccccc; padding: 10px 0; }}
     .today-marker {{ background-color: #000000; color: white !important; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; border-radius: 4px; }}
+    
     div[data-testid="stSegmentedControl"] button {{ border: 1px solid #cccccc !important; color: #999999 !important; background-color: #ffffff !important; }}
     div[data-testid="stSegmentedControl"] button[aria-checked="true"] {{ background-color: #000000 !important; color: #ffffff !important; border-color: #000000 !important; }}
+
     [data-testid="stVerticalBlockBorderWrapper"] {{ border: 1px solid #cccccc !important; padding: 15px; border-radius: 8px; }}
     .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #000000 !important; border-bottom: 1px dotted #cccccc; padding: 8px 0; text-align: left; }}
     .box-header {{ font-size: 1.05rem; font-weight: 900; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px; }}
+
+    /* サマータイム中：半分のサイズ・グレー */
     .dst-label {{ font-size: 0.75rem; color: #888888 !important; font-weight: normal; margin-left: 8px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. 正確な現地時間の取得（クリーン実装） ---
-# ここで直接タイムゾーンを指定して「今」を取得します。
-# OSの時間に依存せず、pytzがデータベースから最新のEDTオフセットを適用します。
-tz_ny = pytz.timezone('America/New_York')
-tz_jp = pytz.timezone('Asia/Tokyo')
+# --- 3. 正確な時刻取得 (pytzの生のデータをそのまま使用) ---
+# この一行がすべてです。OS設定を無視してNYの現時点を直接引き抜きます。
+now_ny = datetime.now(pytz.timezone('America/New_York'))
+now_jp = datetime.now(pytz.timezone('Asia/Tokyo'))
 
-now_ny_raw = datetime.now(tz_ny)
-now_jp_raw = datetime.now(tz_jp)
-
-# 計算エラーを防ぐため、UI表示用とは別に、演算用の「情報の揃った」オブジェクトを作成
-n_ny = now_ny_raw
-n_jp = now_jp_raw
-
-# --- 5. UI構築 ---
+# --- 4. ヘッダー & 市場データ ---
 st.markdown(f'<div class="header-sticky"><div class="logo-text">{L["logo"]}</div></div>', unsafe_allow_html=True)
+
 _, col_lang = st.columns([8, 2])
 with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
@@ -105,20 +95,30 @@ prices = get_prices()
 p_cols = st.columns(3)
 for i, (k, v) in enumerate(prices.items()):
     with p_cols[i]:
-        st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.8rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.9rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
-if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
+# --- 5. 市場コンテンツ表示 ---
+if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
+if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
+
+AI_NEWS_DATA = {
+    "US": [f"{i+1}. NVIDIA/OpenAI等 米国AI最新ニュース {i+1}" for i in range(10)],
+    "JP": [f"{i+1}. ソフトバンク/さくら等 日本AI最新ニュース {i+1}" for i in range(10)]
+}
+EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
 
 c1, c2 = st.columns(2, gap="medium")
-for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]:
+for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["us_m"]), (c2, now_jp, "JP", "v_jp", "jp", L["jp_m"])]:
     with col:
         st.header(title)
+        
+        # 市場ステータス
         ot, ct = (time(9, 30), time(16, 0)) if cc=="US" else (time(9, 0), time(15, 0))
         h_list = us_holidays if cc=="US" else jp_holidays
+        # タイムゾーンを保持したまま比較
         is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_list)
         
-        # 次回開場計算 (timezone情報を維持したまま計算)
+        # 次回開場計算 (nowのタイムゾーン情報を維持したまま計算)
         target = now.replace(hour=ot.hour, minute=ot.minute, second=0, microsecond=0)
         if now.time() >= ot or now.date() in h_list or now.weekday() >= 5:
             while True:
@@ -136,7 +136,7 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         dst_label = (L["dst_on"] if is_dst else L["dst_off"]) if cc=="US" else ""
         st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px; color:#000000;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{dst_label}</span></div>', unsafe_allow_html=True)
         
-        # カレンダー
+        # カレンダー (土曜=青、日曜・祝日=赤)
         view = st.session_state[s_key]
         cal = calendar.monthcalendar(view.year, view.month)
         h_table = f'<table class="calendar-table"><tr>'
@@ -161,6 +161,7 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=s_key: st.session_state.update({k: date.today().replace(day=1)}))
         with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=28) + timedelta(days=5)).replace(day=1)}))
 
+        # イベント・ニュース枠のデータ流し込み
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{view.month}月 {L["event_title"]}</div>', unsafe_allow_html=True)
             m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_DATA.items()) if k.startswith(view.strftime("%Y-%m")) and (("🇺🇸" in v or "US" in cc) if cc=="US" else ("🇯🇵" in v or "JP" in cc))]
