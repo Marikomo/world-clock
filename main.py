@@ -36,13 +36,14 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 究極の時刻計算ロジック (エラー回避版) ---
-# UTCをベースに取得し、タイムゾーン情報を破棄(replace(tzinfo=None))することで計算エラーを防ぐ
-utc_now = datetime.now(pytz.utc)
-n_ny = utc_now.astimezone(pytz.timezone('America/New_York')).replace(tzinfo=None)
-n_jp = utc_now.astimezone(pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+# --- 2. ニュース・イベントデータ ---
+AI_NEWS_DATA = {
+    "US": ["1. NVIDIA: Blackwell量産開始", "2. OpenAI: GPT-5 プレビュー期待", "3. Microsoft: 日本国内AI投資加速", "4. Google: Gemini 1.5 アップデート", "5. Meta: Llama-4 学習リソース拡大", "6. Apple: WWDCでのAI発表に注目", "7. Amazon: AIチップ内製化進展", "8. Tesla: FSD予測精度向上", "9. AMD: AIサーバーシェア拡大", "10. Intel: AI PCチップ出荷"],
+    "JP": ["1. SBG: 孫会長、AI投資10兆円枠", "2. さくらネット: GPUクラウド完売", "3. NTT: tsuzumi導入企業急増", "4. 富士通: 創薬AI世界1位の精度", "5. NEC: 官公庁AI案件を受注", "6. LINEヤフー: AI検索機能を刷新", "7. 三菱UFJ: 全行員AIアシスタント", "8. トヨタ: レベル4自動運転試験", "9. 楽天: AI統合戦略が加速", "10. 日本政府: 国産AIへの追加支援"]
+}
+EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
 
-# --- 3. CSS (デザイナーズ・ミニマル仕様) ---
+# --- 3. CSS ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -69,7 +70,20 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. UI構築 ---
+# --- 4. 正確な現地時間の取得（クリーン実装） ---
+# ここで直接タイムゾーンを指定して「今」を取得します。
+# OSの時間に依存せず、pytzがデータベースから最新のEDTオフセットを適用します。
+tz_ny = pytz.timezone('America/New_York')
+tz_jp = pytz.timezone('Asia/Tokyo')
+
+now_ny_raw = datetime.now(tz_ny)
+now_jp_raw = datetime.now(tz_jp)
+
+# 計算エラーを防ぐため、UI表示用とは別に、演算用の「情報の揃った」オブジェクトを作成
+n_ny = now_ny_raw
+n_jp = now_jp_raw
+
+# --- 5. UI構築 ---
 st.markdown(f'<div class="header-sticky"><div class="logo-text">{L["logo"]}</div></div>', unsafe_allow_html=True)
 _, col_lang = st.columns([8, 2])
 with col_lang:
@@ -91,16 +105,10 @@ prices = get_prices()
 p_cols = st.columns(3)
 for i, (k, v) in enumerate(prices.items()):
     with p_cols[i]:
-        st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.9rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.8rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
-
-AI_NEWS_DATA = {
-    "US": [f"{i+1}. NVIDIA/OpenAI等 米国AI最新動向 {i+1}" for i in range(10)],
-    "JP": [f"{i+1}. ソフトバンク/さくら等 国内AI最新動向 {i+1}" for i in range(10)]
-}
-EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
 
 c1, c2 = st.columns(2, gap="medium")
 for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]:
@@ -110,8 +118,8 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         h_list = us_holidays if cc=="US" else jp_holidays
         is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_list)
         
-        # カウントダウン計算 (tzinfoを揃えてエラー回避)
-        target = datetime.combine(now.date(), ot)
+        # 次回開場計算 (timezone情報を維持したまま計算)
+        target = now.replace(hour=ot.hour, minute=ot.minute, second=0, microsecond=0)
         if now.time() >= ot or now.date() in h_list or now.weekday() >= 5:
             while True:
                 target += timedelta(days=1)
@@ -123,12 +131,9 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         st_info = "" if is_op else f'<span style="float:right; font-size:0.75rem; color:#666;">{L["next_prefix"]}{c_down}</span>'
         st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op else "#fff5f5"};">{L["open"] if is_op else L["closed"]} {st_info}</div>', unsafe_allow_html=True)
         
-        # サマータイム判定ロジック
-        # 4月はEDT(UTC-4)なので、UTCナウとの差が4時間ならサマータイム
-        utc_test = datetime.now(pytz.utc).replace(tzinfo=None)
-        is_dst = (abs((utc_test - n_ny).total_seconds()) < 15000) # 約4時間差ならDST
+        # 時計表示 (pytzの情報を元にサマータイム判定)
+        is_dst = now.dst() != timedelta(0)
         dst_label = (L["dst_on"] if is_dst else L["dst_off"]) if cc=="US" else ""
-        
         st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px; color:#000000;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{dst_label}</span></div>', unsafe_allow_html=True)
         
         # カレンダー
