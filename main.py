@@ -36,7 +36,16 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. CSS (タイポグラフィの強弱を徹底) ---
+# --- 2. 物理的な時刻計算 (UTC基準) ---
+# サーバーの時間設定に一切頼らず、UTCから直接算出します
+utc_now = datetime.now(pytz.utc)
+
+# 米国東部時間 (ET): サマータイム(EDT)は UTC-4時間
+now_ny = (utc_now - timedelta(hours=4)).replace(tzinfo=None)
+# 日本時間 (JST): UTC+9時間
+now_jp = (utc_now + timedelta(hours=9)).replace(tzinfo=None)
+
+# --- 3. CSS (デザイナーズ・ミニマル仕様) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -47,10 +56,13 @@ st.markdown(f"""
     }}
     .logo-text {{ font-size: 1.4rem; font-weight: 900; color: #000000; letter-spacing: -0.02em; }}
     .block-container {{ padding-top: 3.5rem !important; margin-top: -65px !important; }}
+
     .price-label {{ font-size: 1.15rem; color: #000000 !important; font-weight: 900 !important; margin-bottom: 5px; }}
     .price-box {{ border: 1px solid #cccccc; padding: 15px; background-color: #fff; text-align: center; border-radius: 4px; }}
     .price-val {{ font-size: 1.8rem; font-weight: 900; line-height: 1.1; color: #000000; }}
+    
     .status-line {{ font-size: 1.15rem; font-weight: 900; padding: 12px; border: 1px solid #cccccc; border-left: 10px solid #000000; background-color: #fff; margin-bottom: 15px; }}
+    
     .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; border: 1px solid #cccccc; table-layout: fixed; }}
     .calendar-table th, .calendar-table td {{ border: 1px solid #cccccc; padding: 10px 0; }}
     .today-marker {{ background-color: #000000; color: white !important; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; border-radius: 4px; }}
@@ -62,24 +74,20 @@ st.markdown(f"""
     .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #000000 !important; border-bottom: 1px dotted #cccccc; padding: 8px 0; text-align: left; }}
     .box-header {{ font-size: 1.05rem; font-weight: 900; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px; }}
 
-    /* サマータイム中：半分のサイズ・グレー */
     .dst-label {{ font-size: 0.75rem; color: #888888 !important; font-weight: normal; margin-left: 8px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 正確な時刻取得 (pytzの生のデータをそのまま使用) ---
-# この一行がすべてです。OS設定を無視してNYの現時点を直接引き抜きます。
-now_ny = datetime.now(pytz.timezone('America/New_York'))
-now_jp = datetime.now(pytz.timezone('Asia/Tokyo'))
-
-# --- 4. ヘッダー & 市場データ ---
+# --- 4. ヘッダー表示 ---
 st.markdown(f'<div class="header-sticky"><div class="logo-text">{L["logo"]}</div></div>', unsafe_allow_html=True)
 
 _, col_lang = st.columns([8, 2])
 with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
-    if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
+    if new_lang and new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang; st.rerun()
 
+# --- 5. 価格データ ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = {"S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X"}
@@ -97,13 +105,13 @@ for i, (k, v) in enumerate(prices.items()):
     with p_cols[i]:
         st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.9rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-# --- 5. 市場コンテンツ表示 ---
+# --- 6. 市場コンテンツ ---
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
 
 AI_NEWS_DATA = {
-    "US": [f"{i+1}. NVIDIA/OpenAI等 米国AI最新ニュース {i+1}" for i in range(10)],
-    "JP": [f"{i+1}. ソフトバンク/さくら等 日本AI最新ニュース {i+1}" for i in range(10)]
+    "US": [f"{i+1}. NVIDIA/OpenAI等 米国AI最新動向 {i+1}" for i in range(10)],
+    "JP": [f"{i+1}. ソフトバンク/さくら等 国内AI最新動向 {i+1}" for i in range(10)]
 }
 EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
 
@@ -115,11 +123,10 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         # 市場ステータス
         ot, ct = (time(9, 30), time(16, 0)) if cc=="US" else (time(9, 0), time(15, 0))
         h_list = us_holidays if cc=="US" else jp_holidays
-        # タイムゾーンを保持したまま比較
         is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_list)
         
-        # 次回開場計算 (nowのタイムゾーン情報を維持したまま計算)
-        target = now.replace(hour=ot.hour, minute=ot.minute, second=0, microsecond=0)
+        # 次回開場計算 (単純な数値として計算)
+        target = datetime.combine(now.date(), ot)
         if now.time() >= ot or now.date() in h_list or now.weekday() >= 5:
             while True:
                 target += timedelta(days=1)
@@ -131,9 +138,8 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         st_info = "" if is_op else f'<span style="float:right; font-size:0.75rem; color:#666;">{L["next_prefix"]}{c_down}</span>'
         st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op else "#fff5f5"};">{L["open"] if is_op else L["closed"]} {st_info}</div>', unsafe_allow_html=True)
         
-        # 時計表示 (pytzの情報を元にサマータイム判定)
-        is_dst = now.dst() != timedelta(0)
-        dst_label = (L["dst_on"] if is_dst else L["dst_off"]) if cc=="US" else ""
+        # 時計表示 (米国のみサマータイム中と表記)
+        dst_label = L["dst_on"] if cc=="US" else ""
         st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px; color:#000000;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{dst_label}</span></div>', unsafe_allow_html=True)
         
         # カレンダー (土曜=青、日曜・祝日=赤)
@@ -161,12 +167,13 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=s_key: st.session_state.update({k: date.today().replace(day=1)}))
         with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=28) + timedelta(days=5)).replace(day=1)}))
 
-        # イベント・ニュース枠のデータ流し込み
+        # イベント
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{view.month}月 {L["event_title"]}</div>', unsafe_allow_html=True)
             m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_DATA.items()) if k.startswith(view.strftime("%Y-%m")) and (("🇺🇸" in v or "US" in cc) if cc=="US" else ("🇯🇵" in v or "JP" in cc))]
             st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev) if m_ev else "なし") + '</div>', unsafe_allow_html=True)
 
+        # ニュース
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
             n_items = "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS_DATA[cc]])
