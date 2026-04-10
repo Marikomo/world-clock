@@ -33,39 +33,19 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. CSS（余白を大幅に強化） ---
+# --- 2. CSS ---
 st.markdown(f"""
 <style>
     [data-testid="stHeader"] {{ display: none !important; }}
-    /* 全体の余白調整 */
-    .block-container {{ padding: 2rem 5rem !important; margin-top: -30px !important; }}
-    
-    .logo-text {{ font-size: 1.6rem; font-weight: 900; letter-spacing: -0.03em; color: #111; margin-bottom: 30px; }}
-    
-    /* セクション間の余白 */
-    .stHorizontalBlock {{ gap: 3rem !important; }}
-    
-    /* 価格ボードの余白 */
-    .absolute-row {{ display: flex; justify-content: space-between; gap: 20px; margin-bottom: 40px; }}
-    .price-box {{ border: 1px solid #eee; padding: 25px 15px; background-color: #fff; text-align: center; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }}
-    .price-val {{ font-size: 1.8rem; font-weight: 900; line-height: 1.2; color: #111; margin: 8px 0; }} 
-
-    /* ステータスラインの余白 */
-    .status-line {{ font-size: 1.3rem; font-weight: 900; padding: 20px; border: 1px solid #ddd; border-left: 12px solid #111; background-color: #fff; margin-bottom: 25px; }}
-    
-    /* カレンダーの余白 */
-    .calendar-table {{ width: 100%; border-collapse: separate; border-spacing: 0 10px; text-align: center; margin-top: 15px; }}
-    .calendar-table th {{ padding-bottom: 15px; }}
-    .calendar-table td {{ padding: 8px 0; }}
-    .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; font-weight: 800; border-radius: 6px; }}
-    .event-mark {{ text-decoration: underline wavy #d71920; text-underline-offset: 6px; font-weight: 800; }}
-    
-    /* リストボックス内の余白 */
-    .item-row {{ font-size: 0.9rem; line-height: 1.8; color: #333; border-bottom: 1px dotted #ddd; padding: 12px 0; text-align: left; }}
-    .box-header {{ font-size: 1.1rem; font-weight: 900; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 20px; }}
-    
-    /* コンテナ外枠の余白 */
-    [data-testid="stExpander"], .st-emotion-cache-12w0qpk {{ margin-top: 20px; padding: 10px; }}
+    .block-container {{ padding-top: 0rem !important; margin-top: -65px !important; }}
+    .logo-text {{ font-size: 1.4rem; font-weight: 900; letter-spacing: -0.03em; color: #111; margin-bottom: 20px; }}
+    .price-box {{ border: 1px solid #ddd; padding: 15px; background-color: #fff; text-align: center; border-radius: 4px; }}
+    .price-val {{ font-size: 1.7rem; font-weight: 900; line-height: 1.1; color: #111; }} 
+    .status-line {{ font-size: 1.25rem; font-weight: 900; padding: 12px; border: 1px solid #ddd; border-left: 10px solid #111; background-color: #fff; margin-bottom: 10px; }}
+    .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; margin-top: 10px; }}
+    .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; font-weight: 800; border-radius: 4px; }}
+    .event-mark {{ text-decoration: underline wavy #d71920; text-underline-offset: 5px; font-weight: 800; cursor: pointer; }}
+    .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #333; border-bottom: 1px dotted #ccc; padding: 6px 0; text-align: left; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,8 +58,8 @@ EVENTS_DATA = {
     "2026-05-05": "🇯🇵 こどもの日", "2026-05-20": "🇺🇸 NVIDIA 決算予定", "2026-11-03": "🇺🇸 米国中間選挙"
 }
 AI_NEWS_DATA = {
-    "US": [f"・米国AIニュース {i+1}: NVIDIA / OpenAI の最新市場動向 {i+1}" for i in range(10)],
-    "JP": [f"・日本AIニュース {i+1}: ソフトバンク / さくらネット 最新動向 {i+1}" for i in range(10)]
+    "US": [f"・米国AIニュース {i+1}: NVIDIA/OpenAI 最新動向 {i+1}" for i in range(10)],
+    "JP": [f"・日本AIニュース {i+1}: SBG/さくら 最新AI動向 {i+1}" for i in range(10)]
 }
 
 @st.cache_data(ttl=60)
@@ -96,20 +76,17 @@ def get_prices():
 prices = get_prices()
 
 # --- 4. ヘッダー ---
-st.markdown(f'<div class="logo-text">{L["logo"]}</div>', unsafe_allow_html=True)
-col_lang_left, col_lang_right = st.columns([8, 2])
-with col_lang_right:
+col_logo, col_lang = st.columns([7, 3])
+with col_logo: st.markdown(f'<div class="logo-text">{L["logo"]}</div>', unsafe_allow_html=True)
+with col_lang:
     new_lang = st.segmented_control("LANG", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
-    if new_lang and new_lang != st.session_state.lang:
-        st.session_state.lang = new_lang; st.rerun()
+    if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
 # --- 5. 価格ボード ---
 cols_p = st.columns(3)
 for i, (k, v) in enumerate(prices.items()):
     with cols_p[i]:
-        st.markdown(f'<div class="price-box"><div style="font-size:0.95rem; color:#666; font-weight:700;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:1rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
-
-st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown(f'<div class="price-box"><div style="font-size:0.85rem; color:#666; font-weight:700;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
 # --- 6. 市場レイアウト ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
@@ -117,25 +94,25 @@ n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
 
-c1, c2 = st.columns(2)
+c1, c2 = st.columns(2, gap="large")
 for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]:
     with col:
-        st.markdown(f"### {title}")
+        st.header(title)
         # ステータス
         ot, ct = (time(9, 30), time(16, 0)) if cc=="US" else (time(9, 0), time(15, 0))
         is_op = (ot <= now.time() < ct and now.weekday() < 5)
         st_txt = L["open"] if is_op else L["closed"]
-        st.markdown(f'<div class="status-line" style="background-color:{"#e6ffed" if is_op else "#fff1f0"};">{st_txt} <span style="float:right; font-size:0.9rem; color:#666;">Next: 09:30</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="status-line" style="background-color:{"#e6ffed" if is_op else "#fff1f0"};">{st_txt} <span style="float:right; font-size:0.8rem; color:#666;">Next: 09:30</span></div>', unsafe_allow_html=True)
         
-        # 時計
+        # 【修正点】日付、時間、サマータイム表記の順
         dst_status = L["dst_on"] if now.dst() != timedelta(0) else L["dst_off"]
-        dst_ui = f' <span style="color:#d71920; font-size:0.9rem; font-weight:900;">({dst_status})</span>' if cc == "US" else ""
-        st.markdown(f'<div style="font-weight:900; font-size:1.3rem; margin-bottom:20px;">{now.strftime("%Y/%m/%d")} {now.strftime("%H:%M:%S")}{dst_ui}</div>', unsafe_allow_html=True)
+        dst_ui = f' <span style="color:#d71920; font-size:0.85rem; font-weight:900;">({dst_status})</span>' if cc == "US" else ""
+        st.markdown(f'<div style="font-weight:900; font-size:1.15rem; margin-bottom:10px;">{now.strftime("%Y/%m/%d")} {now.strftime("%H:%M:%S")}{dst_ui}</div>', unsafe_allow_html=True)
         
         # カレンダー
         view = st.session_state[state_key]
         cal = calendar.monthcalendar(view.year, view.month)
-        h = f'<table class="calendar-table"><tr>' + "".join([f'<th style="color:{"#d71920" if i==0 or i==6 else "#888"};">{d}</th>' for i, d in enumerate([L["sun"],L["mon"],L["tue"],L["wed"],L["thu"],L["fri"],L["sat"]])]) + '</tr>'
+        h = f'<table class="calendar-table"><tr>' + "".join([f'<th style="color:{"#d71920" if i==0 or i==6 else "#888"}; font-size:0.8rem;">{d}</th>' for i, d in enumerate([L["sun"],L["mon"],L["tue"],L["wed"],L["thu"],L["fri"],L["sat"]])]) + '</tr>'
         for w in cal:
             h += '<tr>'
             for i, d in enumerate(w):
@@ -148,22 +125,25 @@ for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L[
             h += '</tr>'
         st.markdown(h + '</table>', unsafe_allow_html=True)
 
-        # ボタン
-        st.markdown("<br>", unsafe_allow_html=True)
+        # カレンダー操作ボタン
         bc = st.columns(3)
-        with bc[0]: st.button(L["prev"], key=f"p_{suffix}", on_click=lambda k=state_key, v=view: st.session_state.update({k: (v.replace(day=1) - timedelta(days=1)).replace(day=1)}))
-        with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=state_key: st.session_state.update({k: date.today().replace(day=1)}))
-        with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=state_key, v=view: st.session_state.update({k: (v.replace(day=28) + timedelta(days=5)).replace(day=1)}))
+        with bc[0]: 
+            if st.button(L["prev"], key=f"p_{suffix}"):
+                m, y = (view.month-1, view.year) if view.month > 1 else (12, view.year-1); st.session_state[state_key] = date(y, m, 1); st.rerun()
+        with bc[1]:
+            if st.button(L["today"], key=f"t_{suffix}"): st.session_state[state_key] = now.date().replace(day=1); st.rerun()
+        with bc[2]:
+            if st.button(L["next_m"], key=f"n_{suffix}"):
+                m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1); st.session_state[state_key] = date(y, m, 1); st.rerun()
 
-        # 【枠：イベント】
-        st.markdown("<br>", unsafe_allow_html=True)
+        # 【連動：株式イベント】
+        st.subheader(f"{view.month}月 {L['event_title']}")
         with st.container(border=True):
-            st.markdown(f'<div class="box-header">{view.month}月 {L["event_title"]}</div>', unsafe_allow_html=True)
             m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_DATA.items()) if k.startswith(view.strftime("%Y-%m")) and (("🇺🇸" in v or "US" in cc) if cc=="US" else ("🇯🇵" in v or "JP" in cc))]
-            st.markdown('<div style="height:300px; overflow-y:auto;">' + ("".join(m_ev) if m_ev else '<div class="item-row">なし</div>') + '</div>', unsafe_allow_html=True)
+            if m_ev: st.markdown('<div style="height:250px; overflow-y:auto;">' + "".join(m_ev) + '</div>', unsafe_allow_html=True)
+            else: st.write(f"{view.month}月の注目イベントはありません")
 
-        # 【枠：ニュース】
-        st.markdown("<br>", unsafe_allow_html=True)
+        # 【固定：今週のAIニュース】
+        st.subheader(L["news_title"])
         with st.container(border=True):
-            st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
-            st.markdown('<div style="height:300px; overflow-y:auto;">' + "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS_DATA[cc]]) + '</div>', unsafe_allow_html=True)
+            st.markdown('<div style="height:250px; overflow-y:auto;">' + "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS_DATA[cc]]) + '</div>', unsafe_allow_html=True)
