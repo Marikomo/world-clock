@@ -46,30 +46,29 @@ st.markdown(f"""
     }}
     .hover-tip:hover .hover-text {{ visibility: visible; opacity: 1; transition-delay: 0.6s; }}
     .status-line {{ font-size: 1.2rem; font-weight: 900; padding: 12px; border: 1px solid #ddd; border-left: 8px solid #111; background-color: #fff; margin-bottom: 10px; }}
-    .status-next {{ font-size: 0.8rem; color: #666; }}
+    .status-next {{ font-size: 0.8rem; color: #666; font-weight: 700; }}
     .calendar-table {{ width: 100%; border-collapse: collapse; table-layout: fixed; text-align: center; margin-top: 10px; }}
     .calendar-table th {{ font-size: 0.8rem; color: #888; padding-bottom: 5px; }}
     .today-marker {{ background-color: #111; color: white; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; }}
     .holiday-red {{ color: #d71920; font-weight: 800; }}
     .event-mark {{ text-decoration: underline wavy #d71920; text-underline-offset: 4px; cursor: help; }}
-    .list-box {{ background: #fdfdfd; border: 1px solid #eee; padding: 12px; margin-top: 15px; border-radius: 4px; }}
-    .list-title {{ font-size: 0.95rem; font-weight: 900; border-bottom: 2px solid #111; padding-bottom: 4px; margin-bottom: 8px; }}
+    .list-box {{ background: #fdfdfd; border: 1px solid #eee; padding: 12px; margin-top: 15px; border-radius: 4px; text-align: left; }}
+    .list-title {{ font-size: 0.95rem; font-weight: 900; border-bottom: 2px solid #111; padding-bottom: 4px; margin-bottom: 8px; color: #111; }}
     .list-item {{ font-size: 0.85rem; line-height: 1.6; color: #333; margin-bottom: 4px; }}
 </style>
 """, unsafe_allow_html=True)
 
 # --- 3. コンテンツデータ ---
-AI_NEWS = {
-    "US": ["・NVIDIA: 次世代Blackwellチップの需要が供給を大幅超過", "・OpenAI: 「GPT-5」開発に向けた数兆円規模の投資を準備", "・Microsoft: AIインフラへの投資を倍増、株価反発"],
-    "JP": ["・ソフトバンクG: AI革命に向け英Arm株を担保に巨額資金確保", "・サクラエディタ/さくらネット: 政府支援によるAIスパコン増強完了", "・日本企業: 生成AI導入率が前年比2倍、業務効率化が顕著"]
+AI_NEWS_DATA = {
+    "US": ["・NVIDIA: 次世代Blackwell需要が供給を超過", "・OpenAI: GPT-5開発に向けた巨額投資を準備", "・Microsoft: AIインフラ投資を倍増、株価反発"],
+    "JP": ["・ソフトバンクG: AI革命へArm株担保に資金確保", "・さくらネット: 政府支援によるAIスパコン増強", "・日本企業: 生成AI導入率が前年比2倍に急増"]
 }
-EVENTS = {
+EVENTS_DATA = {
     "2026-11-03": "🇺🇸 アメリカ中間選挙 (全議席改選)",
     "2026-05-03": "🇯🇵 憲法記念日 (市場休場)",
     "2026-05-04": "🇯🇵 みどりの日 (市場休場)",
     "2026-05-05": "🇯🇵 こどもの日 (市場休場)",
     "2026-04-15": "🇺🇸 大手テック企業決算発表ピーク開始",
-    "2026-04-20": "🇯🇵 日銀金融政策決定会合 議事要旨発表"
 }
 
 @st.cache_data(ttl=60)
@@ -92,9 +91,9 @@ with col_h2:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
-# --- 5. 価格ボード（ホバーでUS/JP両方のニュースを表示） ---
+# --- 5. 価格ボード ---
 p_html = '<div class="absolute-row">'
-news_combined = "<br>".join(AI_NEWS["US"] + AI_NEWS["JP"])
+news_combined = "<br>".join(AI_NEWS_DATA["US"] + AI_NEWS_DATA["JP"])
 for name, d in prices.items():
     c_cls = "color: #d71920;" if d['diff'] >= 0 else "color: #0050b3;"
     p_html += f'''
@@ -108,12 +107,7 @@ for name, d in prices.items():
     </div>'''
 st.markdown(p_html + '</div>', unsafe_allow_html=True)
 
-# --- 6. 市場ステータスとカレンダー ---
-t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
-n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
-if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
-if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
-
+# --- 6. 市場ステータス計算 ---
 def get_market_info(now, m_type):
     cc, th = ("US", holidays.CountryHoliday("US")) if m_type == "US" else ("JP", holidays.CountryHoliday("JP"))
     ot, ct = (time(9, 30), time(16, 0)) if m_type == "US" else (time(9, 0), time(15, 0))
@@ -127,22 +121,30 @@ def get_market_info(now, m_type):
             nx += timedelta(days=1)
             if nx.weekday() < 5 and nx not in th: break
     target_dt = datetime.combine(nx, ot)
-    if m_type == "US": target_dt = pytz.timezone('America/New_York').localize(target_dt)
-    else: target_dt = pytz.timezone('Asia/Tokyo').localize(target_dt)
+    tz = pytz.timezone('America/New_York') if m_type == "US" else pytz.timezone('Asia/Tokyo')
+    target_dt = tz.localize(target_dt)
     diff = target_dt - now
     h, r = divmod(int(diff.total_seconds()), 3600); m, _ = divmod(r, 60)
     countdown = f"{L['next']} {h}h {m}m" if not is_open else ""
     return f'<div class="status-line" style="background-color: {bg};"><div style="display:flex; justify-content:space-between; align-items:center;"><span>{st_text}</span><span class="status-next">{countdown}</span></div></div>'
 
+# --- 7. レイアウト ---
+t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
+n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
+if 'v_us' not in st.session_state: st.session_state.v_us = n_ny.date().replace(day=1)
+if 'v_jp' not in st.session_state: st.session_state.v_jp = n_jp.date().replace(day=1)
+
 c1, c2 = st.columns(2, gap="large")
-for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]:
+market_data = [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]
+
+for col, now, cc, state_key, suffix, title in market_data:
     with col:
         st.header(title)
         st.markdown(get_market_info(now, cc), unsafe_allow_html=True)
-        dst = f' <span style="color:#d71920; font-size:0.75rem;">DST ON</span>' if now.dst() != timedelta(0) else ""
+        dst = f' <span style="color:#d71920; font-size:0.75rem;">DST ON (サマータイム中)</span>' if now.dst() != timedelta(0) else ""
         st.markdown(f'<div style="font-weight:900; font-size:1.1rem; margin-top:5px;">{now.strftime("%H:%M:%S")}{dst if cc=="US" else ""} <span style="font-size:0.8rem; color:#666;">({now.strftime("%Y/%m/%d")})</span></div>', unsafe_allow_html=True)
         
-        # カレンダー
+        # カレンダー表示
         view = st.session_state[state_key]
         th = holidays.CountryHoliday(cc, years=view.year)
         cal = calendar.monthcalendar(view.year, view.month)
@@ -153,7 +155,8 @@ for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L[
                 if d == 0: html += '<td></td>'
                 else:
                     curr = date(view.year, view.month, d)
-                    ev_txt = EVENTS.get(curr.strftime("%Y-%m-%d"), "")
+                    curr_str = curr.strftime("%Y-%m-%d")
+                    ev_txt = EVENTS_DATA.get(curr_str, "")
                     cls = "holiday-red" if (i==0 or i==6 or curr in th) else ""
                     day_html = f'<span class="today-marker">{d}</span>' if curr == now.date() else str(d)
                     if ev_txt:
@@ -162,16 +165,16 @@ for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L[
             html += '</tr>'
         st.markdown(html + '</table>', unsafe_allow_html=True)
         
-        # カレンダー下：イベント一覧表示
-        ev_list = [f'<div class="list-item">{k[5:]:k[10:]}: {v}</div>' for k, v in EVENTS.items() if (cc == "US" and "🇺🇸" in v) or (cc == "JP" and "🇯🇵" in v)]
-        if ev_list:
-            st.markdown(f'<div class="list-box"><div class="list-title">{L["event_title"]}</div>{"".join(ev_list)}</div>', unsafe_allow_html=True)
+        # イベント一覧表示
+        current_events = [f'<div class="list-item">{k[5:].replace("-","/")}: {v}</div>' for k, v in EVENTS_DATA.items() if (cc == "US" and "🇺🇸" in v) or (cc == "JP" and "🇯🇵" in v)]
+        if current_events:
+            st.markdown(f'<div class="list-box"><div class="list-title">{L["event_title"]}</div>{"".join(current_events)}</div>', unsafe_allow_html=True)
 
-        # カレンダー下：AIニュース一覧表示
-        news_list = [f'<div class="list-item">{n}</div>' for n in AI_NEWS[cc]]
-        st.markdown(f'<div class="list-box"><div class="list-title">{L["news_title"]}</div>{"".join(news_list)}</div>', unsafe_allow_html=True)
+        # AIニュース一覧表示
+        current_news = [f'<div class="list-item">{n}</div>' for n in AI_NEWS_DATA[cc]]
+        st.markdown(f'<div class="list-box"><div class="list-title">{L["news_title"]}</div>{"".join(current_news)}</div>', unsafe_allow_html=True)
         
-        # ボタン
+        # カレンダー操作ボタン
         bc = st.columns(3)
         with bc[0]: 
             if st.button(L["prev"], key=f"p_{suffix}"):
