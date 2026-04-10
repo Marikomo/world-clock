@@ -13,9 +13,9 @@ st_autorefresh(interval=60000, key="data_refresh")
 st_autorefresh(interval=1000, key="clock_refresh")
 st.set_page_config(page_title="Market Analytics Dashboard", layout="wide")
 
-# 祝日データの完全分離
-US_HOLIDAYS_DB = holidays.US()
-JP_HOLIDAYS_DB = holidays.Japan()
+# 祝日データの定義 (名前を統一し、完全に分離)
+US_HOLIDAYS = holidays.US()
+JP_HOLIDAYS = holidays.Japan()
 
 T = {
     "JP": {
@@ -37,11 +37,11 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 物理的な時刻取得 (JSTから逆算してEDTを生成) ---
+# --- 2. 時刻取得 (JSTから-13時間してEDTを生成) ---
 now_jp = datetime.now(pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
 now_ny = now_jp - timedelta(hours=13)
 
-# --- 3. CSS (デザイナー仕様: 配色、余白、タイポグラフィ) ---
+# --- 3. CSS (デザイナー仕様: 正確な配色、余白) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -55,11 +55,9 @@ st.markdown(f"""
     .price-box {{ border: 1px solid #cccccc; padding: 15px; background-color: #fff; text-align: center; border-radius: 4px; }}
     .price-val {{ font-size: 1.8rem; font-weight: 900; line-height: 1.1; color: #000000; }}
     .status-line {{ font-size: 1.15rem; font-weight: 900; padding: 12px; border: 1px solid #cccccc; border-left: 10px solid #000000; background-color: #fff; margin-bottom: 15px; }}
-    
     .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; border: 1px solid #cccccc; table-layout: fixed; }}
     .calendar-table th, .calendar-table td {{ border: 1px solid #cccccc; padding: 10px 0; }}
     .today-marker {{ background-color: #000000; color: white !important; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; border-radius: 4px; }}
-    
     .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #000000 !important; border-bottom: 1px dotted #cccccc; padding: 8px 0; text-align: left; }}
     .box-header {{ font-size: 1.05rem; font-weight: 900; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px; }}
     .dst-label {{ font-size: 0.75rem; color: #888888 !important; font-weight: normal; margin-left: 8px; }}
@@ -74,7 +72,7 @@ with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
-# --- 4. 価格データ ---
+# --- 価格データ ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = {"S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X"}
@@ -85,9 +83,9 @@ def get_prices():
             res[k] = {"val": h['Close'].iloc[-1], "diff": h['Close'].iloc[-1] - h['Close'].iloc[-2]}
         except: res[k] = {"val": 0, "diff": 0}
     return res
-prices_raw = get_prices()
+prices_data = get_prices()
 pc = st.columns(3)
-for i, (k, v) in enumerate(prices_raw.items()):
+for i, (k, v) in enumerate(prices_data.items()):
     with pc[i]:
         st.markdown(f'<div class="price-box"><div style="font-weight:900;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
@@ -95,20 +93,20 @@ for i, (k, v) in enumerate(prices_raw.items()):
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
 
-# --- 5. メインレイアウトの物理的分離 ---
+# --- メインレイアウトの物理的分離 ---
 c_left, c_right = st.columns(2, gap="medium")
 
 # ==========================================
-# 🇺🇸 米国市場セクション (US専用コード)
+# 🇺🇸 米国市場エリア (米国専用ロジック)
 # ==========================================
 with c_left:
     st.header(L["us_m"])
     ot_u, ct_u = (time(9, 30), time(16, 0))
-    is_op_u = (ot_u <= now_ny.time() < ct_u and now_ny.weekday() < 5 and now_ny.date() not in US_HOLIDAYS_LIB)
+    is_op_u = (ot_u <= now_ny.time() < ct_u and now_ny.weekday() < 5 and now_ny.date() not in US_HOLIDAYS)
     st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_u else "#fff5f5"};">{L["open"] if is_op_u else L["closed"]}</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_ny.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"]}</span></div>', unsafe_allow_html=True)
 
-    # カレンダー
+    # 米国カレンダー
     v_u = st.session_state.v_us
     cal_u = calendar.monthcalendar(v_u.year, v_u.month)
     h_tab_u = f'<table class="calendar-table"><tr>'
@@ -122,12 +120,13 @@ with c_left:
             if d == 0: h_tab_u += '<td></td>'
             else:
                 curr = date(v_u.year, v_u.month, d)
-                d_c = "#d71920" if (i==0 or curr in US_HOLIDAYS_LIB) else ("#0050b3" if i==6 else "#000000")
+                # 土曜は青、日曜・米国祝日は赤
+                d_c = "#d71920" if (i==0 or curr in US_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
                 d_ui = f'<span class="today-marker">{d}</span>' if curr == now_ny.date() else str(d)
                 h_tab_u += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
     st.markdown(h_tab_u + "</table>", unsafe_allow_html=True)
     
-    # ページ送り
+    # ページ送りボタン (US)
     bu = st.columns(3)
     with bu[0]: st.button(L["prev"], key="p_u", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=1)-timedelta(days=1)).replace(day=1)}))
     with bu[1]: st.button(L["today"], key="t_u", on_click=lambda: st.session_state.update({"v_us": date.today().replace(day=1)}))
@@ -141,16 +140,16 @@ with c_left:
         st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev_u) if m_ev_u else "予定なし") + '</div>', unsafe_allow_html=True)
 
 # ==========================================
-# 🇯🇵 日本市場セクション (JP専用コード)
+# 🇯🇵 日本市場エリア (日本専用ロジック)
 # ==========================================
 with c_right:
     st.header(L["jp_m"])
     ot_j, ct_j = (time(9, 0), time(15, 0))
-    is_op_j = (ot_j <= now_jp.time() < ct_j and now_jp.weekday() < 5 and now_jp.date() not in JP_HOLIDAYS_LIB)
+    is_op_j = (ot_j <= now_jp.time() < ct_j and now_jp.weekday() < 5 and now_jp.date() not in JP_HOLIDAYS)
     st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_j else "#fff5f5"};">{L["open"] if is_op_j else L["closed"]}</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_jp.strftime("%Y/%m/%d %H:%M:%S")}</div>', unsafe_allow_html=True)
 
-    # カレンダー
+    # 日本カレンダー
     v_j = st.session_state.v_jp
     cal_j = calendar.monthcalendar(v_j.year, v_j.month)
     h_tab_j = f'<table class="calendar-table"><tr>'
@@ -164,12 +163,13 @@ with c_right:
             if d == 0: h_tab_j += '<td></td>'
             else:
                 curr = date(v_j.year, v_j.month, d)
-                d_c = "#d71920" if (i==0 or curr in JP_HOLIDAYS_LIB) else ("#0050b3" if i==6 else "#000000")
+                # 土曜は青、日曜・日本祝日は赤
+                d_c = "#d71920" if (i==0 or curr in JP_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
                 d_ui = f'<span class="today-marker">{d}</span>' if curr == now_jp.date() else str(d)
                 h_tab_j += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
     st.markdown(h_tab_j + "</table>", unsafe_allow_html=True)
-
-    # ページ送り
+    
+    # ページ送りボタン (JP)
     bj = st.columns(3)
     with bj[0]: st.button(L["prev"], key="p_j", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=1)-timedelta(days=1)).replace(day=1)}))
     with bj[1]: st.button(L["today"], key="t_j", on_click=lambda: st.session_state.update({"v_jp": date.today().replace(day=1)}))
