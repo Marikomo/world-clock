@@ -36,22 +36,22 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. ニュース・イベントデータ (生データを明示的に定義) ---
+# --- 2. ニュース・イベントデータ ---
 AI_NEWS_LIST = {
     "US": [
-        "1. NVIDIA: 次世代Blackwellチップの需要が供給を大幅超過",
-        "2. OpenAI: GPT-5のプレビュー版公開が数ヶ月以内との報道",
-        "3. Microsoft: 日本国内AIデータセンターへ4400億円投資",
-        "4. Google: Gemini 1.5 Proが100万トークンの入力をサポート",
-        "5. Meta: 独自LLM Llama-4 学習用にH100を10万枚確保",
+        "1. NVIDIA: Blackwellチップの本格量産体制を構築完了",
+        "2. OpenAI: GPT-5の内部テスト段階入りを公式示唆",
+        "3. Microsoft: 日本国内AIインフラへ4400億円投資を加速",
+        "4. Google: Gemini 1.5 Proの機能を開発者向けに全開放",
+        "5. Meta: 独自LLM Llama-4 学習用H100を10万枚確保",
         "6. Apple: WWDCに向けiOSへの独自生成AI搭載を最終調整",
         "7. Amazon: AIスタートアップAnthropicへ追加出資で攻勢",
         "8. Tesla: AI搭載自動運転FSD v12の予測精度が飛躍的向上",
-        "9. AMD: AIサーバーシェア獲得に向けMI300を増産体制へ",
-        "10. Palantir: 米軍とのAI分析契約更新で株価が安定推移"
+        "9. AMD: AIサーバーシェア獲得に向けMI300を増産",
+        "10. Intel: AI PC向け最新チップの生産ラインをフル稼働"
     ],
     "JP": [
-        "1. ソフトバンクG: 孫会長、AI革命に向けた10兆円投資枠を確保",
+        "1. SBG: 孫会長、AI革命に向けた10兆円投資枠を確保",
         "2. さくらネット: GPUクラウド『高火力』の予約が年内満杯",
         "3. NTT: 独自LLM『tsuzumi』の商用導入が50社を突破",
         "4. 富士通: 創薬AIの精度が世界1位を記録、開発期間短縮",
@@ -65,16 +65,14 @@ AI_NEWS_LIST = {
 }
 
 EVENTS_DATA = {
-    "2026-04-10": "🇺🇸 米 消費者物価指数(CPI) 発表",
-    "2026-04-11": "🇺🇸 米 生産者物価指数(PPI) 発表",
-    "2026-04-15": "🇺🇸 米 大手金融機関 決算発表開始",
+    "2026-04-10": "🇺🇸 米 CPI(消費者物価指数) 発表",
     "2026-04-28": "🇯🇵 日銀結果発表・植田総裁会見",
     "2026-04-30": "🇺🇸 FOMC金利発表・パウエル会見",
     "2026-05-01": "🇺🇸 米 雇用統計 発表",
     "2026-05-20": "🇺🇸 NVIDIA 決算発表予定"
 }
 
-# --- 3. CSS (デザイン・文字サイズの黄金比) ---
+# --- 3. CSS (タイポグラフィの微調整) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -87,7 +85,7 @@ st.markdown(f"""
     .logo-text {{ font-size: 1.4rem; font-weight: 900; color: #000000; }}
     .block-container {{ padding-top: 3.5rem !important; margin-top: -65px !important; }}
 
-    /* 価格ボードタイトルを大きく黒く */
+    /* 価格ボードタイトル強調 */
     .price-label {{ font-size: 1.1rem; color: #000000 !important; font-weight: 900 !important; margin-bottom: 5px; }}
     .price-box {{ border: 1px solid #cccccc; padding: 15px; background-color: #fff; text-align: center; border-radius: 4px; }}
     .price-val {{ font-size: 1.8rem; font-weight: 900; line-height: 1.1; color: #000000; }}
@@ -98,14 +96,16 @@ st.markdown(f"""
     .calendar-table th, .calendar-table td {{ border: 1px solid #cccccc; padding: 10px 0; }}
     .today-marker {{ background-color: #000000; color: white !important; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; border-radius: 4px; }}
     
-    /* ボタンと言語切替 */
+    /* 言語スイッチ */
     div[data-testid="stSegmentedControl"] button {{ border: 1px solid #cccccc !important; color: #999999 !important; background-color: #ffffff !important; }}
     div[data-testid="stSegmentedControl"] button[aria-checked="true"] {{ background-color: #000000 !important; color: #ffffff !important; border-color: #000000 !important; }}
 
-    /* ニュース・イベント枠 */
     [data-testid="stVerticalBlockBorderWrapper"] {{ border: 1px solid #cccccc !important; padding: 15px; border-radius: 8px; }}
     .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #000000 !important; border-bottom: 1px dotted #cccccc; padding: 8px 0; text-align: left; }}
     .box-header {{ font-size: 1.05rem; font-weight: 900; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px; }}
+
+    /* 時計横のテキストサイズ・カラー指定 */
+    .dst-label {{ font-size: 0.7rem; color: #888888 !important; font-weight: normal; margin-left: 5px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,8 +124,7 @@ def get_prices():
     for k, v in tickers.items():
         try:
             t = yf.Ticker(v); h = t.history(period="2d")
-            c, p = h['Close'].iloc[-1], h['Close'].iloc[-2]
-            res[k] = {"val": c, "diff": c - p}
+            res[k] = {"val": h['Close'].iloc[-1], "diff": h['Close'].iloc[-1] - h['Close'].iloc[-2]}
         except: res[k] = {"val": 0, "diff": 0}
     return res
 prices = get_prices()
@@ -135,7 +134,7 @@ for i, (k, v) in enumerate(prices.items()):
     with p_cols[i]:
         st.markdown(f'<div class="price-box"><div class="price-label">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800; font-size:0.9rem;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-# --- 5. 市場レイアウト ---
+# --- 5. 市場コンテンツ ---
 t_ny, t_jp = pytz.timezone('America/New_York'), pytz.timezone('Asia/Tokyo')
 n_ny, n_jp = datetime.now(t_ny), datetime.now(t_jp)
 
@@ -146,7 +145,6 @@ c1, c2 = st.columns(2, gap="medium")
 for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_m"]), (c2, n_jp, "JP", "v_jp", "jp", L["jp_m"])]:
     with col:
         st.header(title)
-        
         ot, ct = (time(9, 30), time(16, 0)) if cc=="US" else (time(9, 0), time(15, 0))
         h_list = us_holidays if cc=="US" else jp_holidays
         is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_list)
@@ -163,9 +161,9 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         st_info = "" if is_op else f'<span style="float:right; font-size:0.75rem; color:#666;">{L["next_prefix"]}{c_down}</span>'
         st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op else "#fff5f5"};">{L["open"] if is_op else L["closed"]} {st_info}</div>', unsafe_allow_html=True)
         
-        # 時計表示 (サマータイム中を時計と同じサイズに)
+        # 時計表示 (サマータイム中を半分のサイズ・グレーに)
         dst_info = (L["dst_on"] if now.dst() != timedelta(0) else L["dst_off"]) if cc=="US" else ""
-        st.markdown(f'<div style="font-weight:900; font-size:1.3rem; margin-bottom:15px; color:#000000;">{now.strftime("%Y/%m/%d %H:%M:%S")} {dst_info}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px; color:#000000;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{dst_info}</span></div>', unsafe_allow_html=True)
         
         # カレンダー
         view = st.session_state[s_key]
@@ -192,13 +190,13 @@ for col, now, cc, s_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L["us_
         with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=s_key: st.session_state.update({k: date.today().replace(day=1)}))
         with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=28) + timedelta(days=5)).replace(day=1)}))
 
-        # イベント枠 (生データを確実に流し込み)
+        # イベント枠
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{view.month}月 注目の株式イベント</div>', unsafe_allow_html=True)
             m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_DATA.items()) if k.startswith(view.strftime("%Y-%m"))]
             st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev) if m_ev else "なし") + '</div>', unsafe_allow_html=True)
 
-        # ニュース枠 (生データを確実に流し込み)
+        # ニュース枠
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
             n_items = "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS_LIST[cc]])
