@@ -36,14 +36,12 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 物理的な時刻計算 (UTC基準) ---
+# --- 2. 時刻計算 (UTC基準で固定算出) ---
 utc_now = datetime.now(pytz.utc)
-# 米国東部時間 (EDT: UTC-4)
-now_ny = (utc_now - timedelta(hours=4)).replace(tzinfo=None)
-# 日本時間 (JST: UTC+9)
-now_jp = (utc_now + timedelta(hours=9)).replace(tzinfo=None)
+now_ny = (utc_now - timedelta(hours=4)).replace(tzinfo=None) # EDT
+now_jp = (utc_now + timedelta(hours=9)).replace(tzinfo=None) # JST
 
-# --- 3. CSS (正確な配色とタイポグラフィ) ---
+# --- 3. CSS (配色とタイポグラフィ) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -68,14 +66,10 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. データ・UI構築 ---
+# --- 4. ヘッダー ---
 st.markdown(f'<div class="header-sticky"><div class="logo-text">{L["logo"]}</div></div>', unsafe_allow_html=True)
 
-AI_NEWS_DATA = {
-    "US": ["1. NVIDIA: Blackwell量産開始", "2. OpenAI: GPT-5 プレビュー期待", "3. Microsoft: 日本国内AI投資加速", "4. Google: Gemini 1.5 アップデート", "5. Meta: Llama-4 学習拡大", "6. Apple: WWDCでのAI発表注目", "7. Amazon: AIチップ内製化進展", "8. Tesla: FSD予測精度向上", "9. AMD: AIサーバーシェア拡大", "10. Intel: AI PCチップ出荷"],
-    "JP": ["1. SBG: 孫会長、AI投資10兆円枠", "2. さくらネット: GPUクラウド完売", "3. NTT: tsuzumi導入企業急増", "4. 富士通: 創薬AI世界1位精度", "5. NEC: 官公庁AI案件を受注", "6. LINEヤフー: AI検索機能を刷新", "7. 三菱UFJ: 全行員AIアシスタント", "8. トヨタ: レベル4自動運転試験", "9. 楽天: AI統合戦略が加速", "10. 日本政府: 国産AI追加支援"]
-}
-# すべてのイベントを1つの辞書に集約
+# イベントデータ
 EVENTS_DATA = {
     "2026-04-10": "🇺🇸 米CPI発表",
     "2026-04-28": "🇯🇵 日銀発表",
@@ -83,12 +77,13 @@ EVENTS_DATA = {
     "2026-05-01": "🇺🇸 米雇用統計"
 }
 
+# 言語切り替え
 _, col_lang = st.columns([8, 2])
 with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
-# --- 市場価格 ---
+# --- 5. 価格データ ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = {"S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X"}
@@ -106,9 +101,14 @@ for i, (k, v) in enumerate(prices.items()):
     with p_cols[i]:
         st.markdown(f'<div class="price-box"><div style="font-weight:900;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-# --- メインコンテンツ ---
+# --- 6. コンテンツ表示 ---
 if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
 if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
+
+AI_NEWS = {
+    "US": [f"{i+1}. 米国AI市場 最新動向レポート {i+1}" for i in range(10)],
+    "JP": [f"{i+1}. 日本国内AI導入 注目ニュース {i+1}" for i in range(10)]
+}
 
 c1, c2 = st.columns(2, gap="medium")
 for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["us_m"]), (c2, now_jp, "JP", "v_jp", "jp", L["jp_m"])]:
@@ -118,6 +118,7 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         h_list = us_holidays if cc=="US" else jp_holidays
         is_op = (ot <= now.time() < ct and now.weekday() < 5 and now.date() not in h_list)
         
+        # 次回開場計算
         target = datetime.combine(now.date(), ot)
         if now.time() >= ot or now.date() in h_list or now.weekday() >= 5:
             while True:
@@ -130,7 +131,7 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op else "#fff5f5"};">{L["open"] if is_op else L["closed"]} <span style="float:right; font-size:0.75rem; color:#666;">{"" if is_op else L["next_prefix"]+c_down}</span></div>', unsafe_allow_html=True)
         st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"] if cc=="US" else ""}</span></div>', unsafe_allow_html=True)
         
-        # --- カレンダー表示 (配色修正) ---
+        # --- カレンダー (配色修正) ---
         view = st.session_state[s_key]
         cal = calendar.monthcalendar(view.year, view.month)
         h_table = f'<table class="calendar-table"><tr>'
@@ -144,7 +145,7 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
                 if d == 0: h_table += '<td></td>'
                 else:
                     curr_d = date(view.year, view.month, d)
-                    # 判定: 日曜(i=0) or 祝日なら赤、土曜(i=6)なら青
+                    # 判定: 日曜(i=0) or 祝日は赤、土曜(i=6)は青
                     d_c = "#d71920" if (i==0 or curr_d in h_list) else ("#0050b3" if i==6 else "#000")
                     d_ui = f'<span class="today-marker">{d}</span>' if curr_d == now.date() else str(d)
                     h_table += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
@@ -156,16 +157,16 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
         with bc[1]: st.button(L["today"], key=f"t_{suffix}", on_click=lambda k=s_key: st.session_state.update({k: date.today().replace(day=1)}))
         with bc[2]: st.button(L["next_m"], key=f"n_{suffix}", on_click=lambda k=s_key, v=view: st.session_state.update({k: (v.replace(day=28)+timedelta(days=5)).replace(day=1)}))
 
-        # --- イベント表示 (修正完了) ---
+        # --- イベント表示 (復活) ---
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{view.month}月 {L["event_title"]}</div>', unsafe_allow_html=True)
-            # 現在表示中の月（view）に合致するイベントをフィルタリング
             v_str = view.strftime("%Y-%m")
+            # EVENTS_DATAから該当月のみ抽出
             m_ev = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(EVENTS_DATA.items()) if k.startswith(v_str)]
             st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev) if m_ev else "なし") + '</div>', unsafe_allow_html=True)
 
         # --- ニュース ---
         with st.container(border=True):
             st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
-            n_items = "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS_DATA[cc]])
+            n_items = "".join([f'<div class="item-row">{n}</div>' for n in AI_NEWS[cc]])
             st.markdown(f'<div style="height:250px; overflow-y:auto;">{n_items}</div>', unsafe_allow_html=True)
