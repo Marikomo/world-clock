@@ -151,4 +151,37 @@ for col, now, cc, state_key, suffix, title in [(c1, n_ny, "US", "v_us", "us", L[
         st.markdown(get_market_info(now, cc), unsafe_allow_html=True)
         
         # 時計とサマータイム
-        dst_label = f'<span class="cal-dst">DST ON (サマータイム中)</span>' if now.dst() != timedelta(0) else '<span class="cal-dst" style="color:#666;">DST OFF</span>
+        dst_label = f'<span class="cal-dst">DST ON (サマータイム中)</span>' if now.dst() != timedelta(0) else '<span class="cal-dst" style="color:#666;">DST OFF</span>'
+        dst_info = dst_label if cc == "US" else ""
+        st.markdown(f'<div style="font-weight:900; font-size:1.1rem; margin-top:5px;">{now.strftime("%Y/%m/%d %H:%M:%S")}{dst_info}</div>', unsafe_allow_html=True)
+        
+        # カレンダー
+        view = st.session_state[state_key]
+        th = holidays.CountryHoliday(cc, years=view.year)
+        cal = calendar.monthcalendar(view.year, view.month)
+        h = f'<table class="calendar-table"><tr><th>{L["sun"]}</th><th>{L["mon"]}</th><th>{L["tue"]}</th><th>{L["wed"]}</th><th>{L["thu"]}</th><th>{L["fri"]}</th><th>{L["sat"]}</th></tr>'
+        for w in cal:
+            h += '<tr>'
+            for i, d in enumerate(w):
+                if d == 0: h += '<td></td>'
+                else:
+                    curr = date(view.year, view.month, d)
+                    ev = EVENTS.get(curr.strftime("%Y-%m-%d"), "")
+                    cls = "holiday-red" if (i==0 or i==6 or curr in th) else ""
+                    day_html = f'<span class="today-marker">{d}</span>' if curr == now.date() else str(d)
+                    if ev: h += f'<td><div class="hover-tip"><span class="{cls} event-mark">{day_html}</span><span class="hover-text"><b style="color:#FFD700;">{L["event"]}</b><br>{ev}</span></div></td>'
+                    else: h += f'<td><span class="{cls}">{day_html}</span></td>'
+            h += '</tr>'
+        st.markdown(h + '</table>', unsafe_allow_html=True)
+        
+        bc = st.columns(3)
+        with bc[0]: 
+            if st.button(L["prev"], key=f"p_{suffix}"):
+                m, y = (view.month-1, view.year) if view.month > 1 else (12, view.year-1)
+                st.session_state[state_key] = date(y, m, 1); st.rerun()
+        with bc[1]:
+            if st.button(L["today"], key=f"t_{suffix}"): st.session_state[state_key] = now.date().replace(day=1); st.rerun()
+        with bc[2]:
+            if st.button(L["next_m"], key=f"n_{suffix}"):
+                m, y = (view.month+1, view.year) if view.month < 12 else (1, view.year+1)
+                st.session_state[state_key] = date(y, m, 1); st.rerun()
