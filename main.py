@@ -13,9 +13,9 @@ st_autorefresh(interval=60000, key="data_refresh")
 st_autorefresh(interval=1000, key="clock_refresh")
 st.set_page_config(page_title="Market Analytics Dashboard", layout="wide")
 
-# 祝日データの定義 (名前を統一し、完全に分離)
-US_HOLIDAYS = holidays.US()
-JP_HOLIDAYS = holidays.Japan()
+# 祝日データの完全分離定義
+US_HOLIDAYS_DB = holidays.US()
+JP_HOLIDAYS_DB = holidays.Japan()
 
 T = {
     "JP": {
@@ -37,9 +37,9 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 時刻取得 (JSTから-13時間してEDTを生成) ---
-now_jp = datetime.now(pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
-now_ny = now_jp - timedelta(hours=13)
+# --- 2. 時刻取得 (JSTから物理的に13時間戻してEDTを生成) ---
+now_jst = datetime.now(pytz.timezone('Asia/Tokyo')).replace(tzinfo=None)
+now_edt = now_jst - timedelta(hours=13)
 
 # --- 3. CSS (デザイナー仕様: 正確な配色、余白) ---
 st.markdown(f"""
@@ -72,7 +72,7 @@ with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
     if new_lang and new_lang != st.session_state.lang: st.session_state.lang = new_lang; st.rerun()
 
-# --- 価格データ ---
+# --- 4. 市場データ取得 ---
 @st.cache_data(ttl=60)
 def get_prices():
     tickers = {"S&P 500": "^GSPC", "Gold": "GC=F", "USD/JPY": "JPY=X"}
@@ -89,22 +89,22 @@ for i, (k, v) in enumerate(prices_data.items()):
     with pc[i]:
         st.markdown(f'<div class="price-box"><div style="font-weight:900;">{k}</div><div class="price-val">{v["val"]:,.1f}</div><div style="color:{"#d71920" if v["diff"]>=0 else "#0050b3"}; font-weight:800;">{"▲" if v["diff"]>=0 else "▼"}{abs(v["diff"]):.1f}</div></div>', unsafe_allow_html=True)
 
-# セッション状態
-if 'v_us' not in st.session_state: st.session_state.v_us = now_ny.date().replace(day=1)
-if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jp.date().replace(day=1)
+# セッション初期化
+if 'v_us' not in st.session_state: st.session_state.v_us = now_edt.date().replace(day=1)
+if 'v_jp' not in st.session_state: st.session_state.v_jp = now_jst.date().replace(day=1)
 
-# --- メインレイアウトの物理的分離 ---
-c_left, c_right = st.columns(2, gap="medium")
+# --- 5. メインレイアウト (物理的にコードを分離) ---
+col_us, col_jp = st.columns(2, gap="medium")
 
 # ==========================================
-# 🇺🇸 米国市場エリア (米国専用ロジック)
+# 🇺🇸 米国市場 (US SECTION)
 # ==========================================
-with c_left:
+with col_us:
     st.header(L["us_m"])
     ot_u, ct_u = (time(9, 30), time(16, 0))
-    is_op_u = (ot_u <= now_ny.time() < ct_u and now_ny.weekday() < 5 and now_ny.date() not in US_HOLIDAYS)
+    is_op_u = (ot_u <= now_edt.time() < ct_u and now_edt.weekday() < 5 and now_edt.date() not in US_HOLIDAYS_DB)
     st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_u else "#fff5f5"};">{L["open"] if is_op_u else L["closed"]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_ny.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"]}</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_edt.strftime("%Y/%m/%d %H:%M:%S")}<span class="dst-label">{L["dst_on"]}</span></div>', unsafe_allow_html=True)
 
     # 米国カレンダー
     v_u = st.session_state.v_us
@@ -120,34 +120,39 @@ with c_left:
             if d == 0: h_tab_u += '<td></td>'
             else:
                 curr = date(v_u.year, v_u.month, d)
-                # 土曜は青、日曜・米国祝日は赤
-                d_c = "#d71920" if (i==0 or curr in US_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
-                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_ny.date() else str(d)
-                h_tab_u += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
+                # 日祝は赤、土曜は青
+                d_color = "#d71920" if (i==0 or curr in US_HOLIDAYS_DB) else ("#0050b3" if i==6 else "#000000")
+                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_edt.date() else str(d)
+                h_tab_u += f'<td><span style="color:{d_color} !important; font-weight:800;">{d_ui}</span></td>'
     st.markdown(h_tab_u + "</table>", unsafe_allow_html=True)
     
-    # ページ送りボタン (US)
     bu = st.columns(3)
-    with bu[0]: st.button(L["prev"], key="p_u", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=1)-timedelta(days=1)).replace(day=1)}))
-    with bu[1]: st.button(L["today"], key="t_u", on_click=lambda: st.session_state.update({"v_us": date.today().replace(day=1)}))
-    with bu[2]: st.button(L["next_m"], key="n_u", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=28)+timedelta(days=5)).replace(day=1)}))
+    with bu[0]: st.button(L["prev"], key="p_us", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=1)-timedelta(days=1)).replace(day=1)}))
+    with bu[1]: st.button(L["today"], key="t_us", on_click=lambda: st.session_state.update({"v_us": date.today().replace(day=1)}))
+    with bu[2]: st.button(L["next_m"], key="n_us", on_click=lambda: st.session_state.update({"v_us": (v_u.replace(day=28)+timedelta(days=5)).replace(day=1)}))
 
     # 米国イベント
     with st.container(border=True):
         st.markdown(f'<div class="box-header">{v_u.month}月 米国市場イベント</div>', unsafe_allow_html=True)
-        E_U = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
-        m_ev_u = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(E_U.items()) if k.startswith(v_u.strftime("%Y-%m"))]
+        ev_us_data = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
+        m_ev_u = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(ev_us_data.items()) if k.startswith(v_u.strftime("%Y-%m"))]
         st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev_u) if m_ev_u else "予定なし") + '</div>', unsafe_allow_html=True)
 
+    # ニュース
+    with st.container(border=True):
+        st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
+        n_us = "".join([f'<div class="item-row">{i+1}. 米国AI・Techニュース {i+1}</div>' for i in range(10)])
+        st.markdown(f'<div style="height:250px; overflow-y:auto;">{n_us}</div>', unsafe_allow_html=True)
+
 # ==========================================
-# 🇯🇵 日本市場エリア (日本専用ロジック)
+# 🇯🇵 日本市場 (JP SECTION)
 # ==========================================
-with c_right:
+with col_jp:
     st.header(L["jp_m"])
     ot_j, ct_j = (time(9, 0), time(15, 0))
-    is_op_j = (ot_j <= now_jp.time() < ct_j and now_jp.weekday() < 5 and now_jp.date() not in JP_HOLIDAYS)
+    is_op_j = (ot_j <= now_jst.time() < ct_j and now_jst.weekday() < 5 and now_jst.date() not in JP_HOLIDAYS_DB)
     st.markdown(f'<div class="status-line" style="background-color:{"#f0fff4" if is_op_j else "#fff5f5"};">{L["open"] if is_op_j else L["closed"]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_jp.strftime("%Y/%m/%d %H:%M:%S")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-weight:900; font-size:1.35rem; margin-bottom:15px;">{now_jst.strftime("%Y/%m/%d %H:%M:%S")}</div>', unsafe_allow_html=True)
 
     # 日本カレンダー
     v_j = st.session_state.v_jp
@@ -163,21 +168,26 @@ with c_right:
             if d == 0: h_tab_j += '<td></td>'
             else:
                 curr = date(v_j.year, v_j.month, d)
-                # 土曜は青、日曜・日本祝日は赤
-                d_c = "#d71920" if (i==0 or curr in JP_HOLIDAYS) else ("#0050b3" if i==6 else "#000000")
-                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_jp.date() else str(d)
-                h_tab_j += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
+                # 日祝は赤、土曜は青
+                d_color = "#d71920" if (i==0 or curr in JP_HOLIDAYS_DB) else ("#0050b3" if i==6 else "#000000")
+                d_ui = f'<span class="today-marker">{d}</span>' if curr == now_jst.date() else str(d)
+                h_tab_j += f'<td><span style="color:{d_color} !important; font-weight:800;">{d_ui}</span></td>'
     st.markdown(h_tab_j + "</table>", unsafe_allow_html=True)
-    
-    # ページ送りボタン (JP)
+
     bj = st.columns(3)
-    with bj[0]: st.button(L["prev"], key="p_j", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=1)-timedelta(days=1)).replace(day=1)}))
-    with bj[1]: st.button(L["today"], key="t_j", on_click=lambda: st.session_state.update({"v_jp": date.today().replace(day=1)}))
-    with bj[2]: st.button(L["next_m"], key="n_j", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=28)+timedelta(days=5)).replace(day=1)}))
+    with bj[0]: st.button(L["prev"], key="p_jp", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=1)-timedelta(days=1)).replace(day=1)}))
+    with bj[1]: st.button(L["today"], key="t_jp", on_click=lambda: st.session_state.update({"v_jp": date.today().replace(day=1)}))
+    with bj[2]: st.button(L["next_m"], key="n_jp", on_click=lambda: st.session_state.update({"v_jp": (v_j.replace(day=28)+timedelta(days=5)).replace(day=1)}))
 
     # 日本イベント
     with st.container(border=True):
         st.markdown(f'<div class="box-header">{v_j.month}月 日本市場イベント</div>', unsafe_allow_html=True)
-        E_J = {"2026-04-28": "🇯🇵 日銀発表", "2026-04-29": "🇯🇵 昭和の日", "2026-05-03": "🇯🇵 憲法記念日"}
-        m_ev_j = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(E_J.items()) if k.startswith(v_j.strftime("%Y-%m"))]
+        ev_jp_data = {"2026-04-28": "🇯🇵 日銀発表", "2026-04-29": "🇯🇵 昭和の日", "2026-05-03": "🇯🇵 憲法記念日"}
+        m_ev_j = [f'<div class="item-row"><b>{k[8:]}日</b>: {v}</div>' for k,v in sorted(ev_jp_data.items()) if k.startswith(v_j.strftime("%Y-%m"))]
         st.markdown('<div style="height:150px; overflow-y:auto;">' + ("".join(m_ev_j) if m_ev_j else "予定なし") + '</div>', unsafe_allow_html=True)
+
+    # ニュース
+    with st.container(border=True):
+        st.markdown(f'<div class="box-header">{L["news_title"]}</div>', unsafe_allow_html=True)
+        n_jp = "".join([f'<div class="item-row">{i+1}. 日本国内AI関連ニュース {i+1}</div>' for i in range(10)])
+        st.markdown(f'<div style="height:250px; overflow-y:auto;">{n_jp}</div>', unsafe_allow_html=True)
