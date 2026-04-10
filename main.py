@@ -36,14 +36,14 @@ T = {
 }
 L = T[st.session_state.lang]
 
-# --- 2. 時刻取得ロジック (UTC基準で1秒の狂いもなく算出) ---
+# --- 2. 物理的な時刻計算 (UTC基準) ---
 utc_now = datetime.now(pytz.utc)
 # 米国東部時間 (EDT: UTC-4)
 now_ny = (utc_now - timedelta(hours=4)).replace(tzinfo=None)
 # 日本時間 (JST: UTC+9)
 now_jp = (utc_now + timedelta(hours=9)).replace(tzinfo=None)
 
-# --- 3. CSS (デザイナー仕様：正確な配色とタイポグラフィ) ---
+# --- 3. CSS (正確な配色とタイポグラフィ) ---
 st.markdown(f"""
 <style>
     .stApp, .block-container {{ background-color: #ffffff !important; color: #000000 !important; }}
@@ -57,9 +57,11 @@ st.markdown(f"""
     .price-box {{ border: 1px solid #cccccc; padding: 15px; background-color: #fff; text-align: center; border-radius: 4px; }}
     .price-val {{ font-size: 1.8rem; font-weight: 900; line-height: 1.1; color: #000000; }}
     .status-line {{ font-size: 1.15rem; font-weight: 900; padding: 12px; border: 1px solid #cccccc; border-left: 10px solid #000000; background-color: #fff; margin-bottom: 15px; }}
+    
     .calendar-table {{ width: 100%; border-collapse: collapse; text-align: center; border: 1px solid #cccccc; table-layout: fixed; }}
     .calendar-table th, .calendar-table td {{ border: 1px solid #cccccc; padding: 10px 0; }}
     .today-marker {{ background-color: #000000; color: white !important; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-weight: 800; border-radius: 4px; }}
+    
     .item-row {{ font-size: 0.88rem; line-height: 1.6; color: #000000 !important; border-bottom: 1px dotted #cccccc; padding: 8px 0; text-align: left; }}
     .box-header {{ font-size: 1.05rem; font-weight: 900; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 12px; }}
     .dst-label {{ font-size: 0.75rem; color: #888888 !important; font-weight: normal; margin-left: 8px; }}
@@ -73,10 +75,14 @@ AI_NEWS_DATA = {
     "US": ["1. NVIDIA: Blackwell量産開始", "2. OpenAI: GPT-5 プレビュー期待", "3. Microsoft: 日本国内AI投資加速", "4. Google: Gemini 1.5 アップデート", "5. Meta: Llama-4 学習拡大", "6. Apple: WWDCでのAI発表注目", "7. Amazon: AIチップ内製化進展", "8. Tesla: FSD予測精度向上", "9. AMD: AIサーバーシェア拡大", "10. Intel: AI PCチップ出荷"],
     "JP": ["1. SBG: 孫会長、AI投資10兆円枠", "2. さくらネット: GPUクラウド完売", "3. NTT: tsuzumi導入企業急増", "4. 富士通: 創薬AI世界1位精度", "5. NEC: 官公庁AI案件を受注", "6. LINEヤフー: AI検索機能を刷新", "7. 三菱UFJ: 全行員AIアシスタント", "8. トヨタ: レベル4自動運転試験", "9. 楽天: AI統合戦略が加速", "10. 日本政府: 国産AI追加支援"]
 }
-# イベントデータ (日付形式を統一)
-EVENTS_DATA = {"2026-04-10": "🇺🇸 米CPI発表", "2026-04-28": "🇯🇵 日銀発表", "2026-04-30": "🇺🇸 FOMC発表", "2026-05-01": "🇺🇸 米雇用統計"}
+# すべてのイベントを1つの辞書に集約
+EVENTS_DATA = {
+    "2026-04-10": "🇺🇸 米CPI発表",
+    "2026-04-28": "🇯🇵 日銀発表",
+    "2026-04-30": "🇺🇸 FOMC発表",
+    "2026-05-01": "🇺🇸 米雇用統計"
+}
 
-# --- 言語切り替え ---
 _, col_lang = st.columns([8, 2])
 with col_lang:
     new_lang = st.segmented_control("L", ["JP", "EN"], default=st.session_state.lang, label_visibility="collapsed")
@@ -138,7 +144,7 @@ for col, now, cc, s_key, suffix, title in [(c1, now_ny, "US", "v_us", "us", L["u
                 if d == 0: h_table += '<td></td>'
                 else:
                     curr_d = date(view.year, view.month, d)
-                    # 配色判定: 日曜(i=0) or 祝日は赤、土曜(i=6)は青
+                    # 判定: 日曜(i=0) or 祝日なら赤、土曜(i=6)なら青
                     d_c = "#d71920" if (i==0 or curr_d in h_list) else ("#0050b3" if i==6 else "#000")
                     d_ui = f'<span class="today-marker">{d}</span>' if curr_d == now.date() else str(d)
                     h_table += f'<td><span style="color:{d_c} !important; font-weight:800;">{d_ui}</span></td>'
